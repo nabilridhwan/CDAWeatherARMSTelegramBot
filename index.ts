@@ -10,27 +10,39 @@ import redis from "./utils/redis";
 const bot = new Telegraf(process.env.BOT_ID!)
 
 const job = schedule.scheduleJob("45 9-15/2 * * 1-5", async (fireDate) => {
-    let subscribedChatIds = await redis.smembers("subscribed_chat_ids");
-    for (let chatId of subscribedChatIds) {
-        try {
-            const cdaWGBT = await getWGBTFromLatLng(CDA.latitude, CDA.longitude);
-            const cdaAirTemp = await getAirTempFromLatLng(CDA.latitude, CDA.longitude);
-            const httcWGBT = await getWGBTFromLatLng(HTTC.latitude, HTTC.longitude);
-            const httcAirTemp = await getAirTempFromLatLng(HTTC.latitude, HTTC.longitude);
+    try {
+        let subscribedChatIds = await redis.smembers("subscribed_chat_ids");
 
-            const reply = `*CDA*:\n🌡️ Heat Stress: ${cdaWGBT.heatStress} ${getWBGTEmoji(cdaWGBT.heatStress)}\n🌍 WBGT: ${cdaWGBT.wbgt} °C\n🌬️ Air Temp: ${cdaAirTemp.value} °C\n\n*HTTC*:\n🌡️ Heat Stress: ${httcWGBT.heatStress} ${getWBGTEmoji(httcWGBT.heatStress)}\n🌍 WBGT: ${httcWGBT.wbgt} °C\n🌬️ Air Temp: ${httcAirTemp.value} °C\n\nLast updated: ${new Date(cdaWGBT.dateTime).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}.\nJob date: ${new Date(fireDate).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}\nNext Update: ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`
-
-            const replacedReply = reply
-                .replaceAll(".", "\\.")
-                .replaceAll("(", "\\(")
-                .replaceAll(")", "\\)")
-
-            await bot.telegram.sendMessage(chatId, replacedReply, {parse_mode: "MarkdownV2"});
-            logger.info(`Weather report sent to chat ID: ${chatId} at ${new Date().toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`);
-        } catch (error) {
-            logger.error("Error fetching weather data:", error);
-            await bot.telegram.sendMessage(chatId, "Failed to fetch weather data. Try /weather command to get the latest data.");
+        if (subscribedChatIds.length === 0) {
+            logger.info("No subscribed chat IDs found. Skipping weather report.");
+            return;
         }
+
+        const [cdaWBGT, cdaAirTemp, httcWBGT, httcAirTemp] = await Promise.all([
+            getWGBTFromLatLng(CDA.latitude, CDA.longitude),
+            getAirTempFromLatLng(CDA.latitude, CDA.longitude),
+            getWGBTFromLatLng(HTTC.latitude, HTTC.longitude),
+            getAirTempFromLatLng(HTTC.latitude, HTTC.longitude)
+        ])
+
+        const reply = `*CDA*:\n🌡️ Heat Stress: ${cdaWBGT.heatStress} ${getWBGTEmoji(cdaWBGT.heatStress)}\n🌍 WBGT: ${cdaWBGT.wbgt} °C\n🌬️ Air Temp: ${cdaAirTemp.value} °C\n\n*HTTC*:\n🌡️ Heat Stress: ${httcWBGT.heatStress} ${getWBGTEmoji(httcWBGT.heatStress)}\n🌍 WBGT: ${httcWBGT.wbgt} °C\n🌬️ Air Temp: ${httcAirTemp.value} °C\n\nLast updated: ${new Date(cdaWBGT.dateTime).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}.\nJob date: ${new Date(fireDate).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}\nNext Update: ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`
+
+        const replacedReply = reply
+            .replaceAll(".", "\\.")
+            .replaceAll("(", "\\(")
+            .replaceAll(")", "\\)")
+
+        await Promise.allSettled(
+            subscribedChatIds.map(chatId => bot.telegram.sendMessage(chatId, replacedReply).catch((err) => {
+                logger.error(`Error sending message to chat ID ${chatId}:`, err);
+                return bot.telegram.sendMessage(chatId, "Failed to fetch weather data. Try /weather command to get the latest data.");
+            }))
+        )
+
+        logger.info("Weather report sent to all subscribed chat IDs at " + new Date().toLocaleString('en-SG', {timeZone: 'Asia/Singapore'}));
+
+    } catch (error) {
+        logger.error("Error fetching weather data:", error);
     }
 })
 
@@ -64,12 +76,14 @@ bot.command("weather", async (ctx) => {
     logger.info("Weather command called by user: " + ctx.from.username + " (ID: " + ctx.from.id + ") in chat ID: " + ctx.chat.id);
 
     try {
-        const cdaWGBT = await getWGBTFromLatLng(CDA.latitude, CDA.longitude);
-        const cdaAirTemp = await getAirTempFromLatLng(CDA.latitude, CDA.longitude);
-        const httcWGBT = await getWGBTFromLatLng(HTTC.latitude, HTTC.longitude);
-        const httcAirTemp = await getAirTempFromLatLng(HTTC.latitude, HTTC.longitude);
+        const [cdaWBGT, cdaAirTemp, httcWBGT, httcAirTemp] = await Promise.all([
+            getWGBTFromLatLng(CDA.latitude, CDA.longitude),
+            getAirTempFromLatLng(CDA.latitude, CDA.longitude),
+            getWGBTFromLatLng(HTTC.latitude, HTTC.longitude),
+            getAirTempFromLatLng(HTTC.latitude, HTTC.longitude)
+        ])
 
-        const reply = `*CDA*:\n🌡️ Heat Stress: ${cdaWGBT.heatStress} ${getWBGTEmoji(cdaWGBT.heatStress)}\n🌍 WBGT: ${cdaWGBT.wbgt} °C\n🌬️ Air Temp: ${cdaAirTemp.value} °C\n\n*HTTC*:\n🌡️ Heat Stress: ${httcWGBT.heatStress} ${getWBGTEmoji(httcWGBT.heatStress)}\n🌍 WBGT: ${httcWGBT.wbgt} °C\n🌬️ Air Temp: ${httcAirTemp.value} °C\n\nLast updated: ${new Date(cdaWGBT.dateTime).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`
+        const reply = `*CDA*:\n🌡️ Heat Stress: ${cdaWBGT.heatStress} ${getWBGTEmoji(cdaWBGT.heatStress)}\n🌍 WBGT: ${cdaWBGT.wbgt} °C\n🌬️ Air Temp: ${cdaAirTemp.value} °C\n\n*HTTC*:\n🌡️ Heat Stress: ${httcWBGT.heatStress} ${getWBGTEmoji(httcWBGT.heatStress)}\n🌍 WBGT: ${httcWBGT.wbgt} °C\n🌬️ Air Temp: ${httcAirTemp.value} °C\n\nLast updated: ${new Date(cdaWBGT.dateTime).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`
 
         const replacedReply = reply
             .replaceAll(".", "\\.")
