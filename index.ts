@@ -9,7 +9,7 @@ import redis from "./utils/redis";
 
 const bot = new Telegraf(process.env.BOT_ID!)
 
-const job = schedule.scheduleJob("45 9-15/2 * * 1-5", async (fireDate) => {
+const job = schedule.scheduleJob("*/5 * * * *", async (fireDate) => {
     try {
         let subscribedChatIds = await redis.smembers("subscribed_chat_ids");
 
@@ -32,12 +32,19 @@ const job = schedule.scheduleJob("45 9-15/2 * * 1-5", async (fireDate) => {
             .replaceAll("(", "\\(")
             .replaceAll(")", "\\)")
 
-        await Promise.allSettled(
+        const sendingChatPromises = await Promise.allSettled(
             subscribedChatIds.map(chatId => bot.telegram.sendMessage(chatId, replacedReply).catch((err) => {
-                logger.error(`Error sending message to chat ID ${chatId}:`, err);
                 return bot.telegram.sendMessage(chatId, "Failed to fetch weather data. Try /weather command to get the latest data.");
             }))
         )
+
+        sendingChatPromises.map((result => {
+            if (result.status === 'rejected') {
+                logger.error(`Failed to send message: ${result.reason}`);
+            } else {
+                logger.info(`Weather report sent to chat ID: ${result.value.chat.id}`);
+            }
+        }))
 
         logger.info("Weather report sent to all subscribed chat IDs at " + new Date().toLocaleString('en-SG', {timeZone: 'Asia/Singapore'}));
 
