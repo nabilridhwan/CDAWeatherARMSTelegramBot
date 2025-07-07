@@ -15,6 +15,10 @@
 - Telegram Bot API (via Telegraf)
 - Fly.io (Deployed on)
 
+## APIs Used
+- [Wet Bulb Globe Temperature (WBGT) API](https://data.gov.sg/datasets/d_87884af1f85d702d4f74c6af13b4853d/view)
+- [Air Temperature across Singapore API](https://data.gov.sg/datasets/d_66b77726bbae1b33f218db60ff5861f0/view)
+
 ## Get started
 1. Click on the link below to add the bot to your Telegram:
    [Add Bot](https://t.me/cda_weather_arms_bot)
