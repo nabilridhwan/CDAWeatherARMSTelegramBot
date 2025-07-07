@@ -1,7 +1,9 @@
 import {Telegraf, Markup} from 'telegraf'
 import schedule from 'node-schedule'
-import {CDA, HTTC, getAirTempFromLatLng, getWGBTFromLatLng, getWBGTEmoji} from "./api/weather";
+import {getAirTempFromLatLng, getWGBTFromLatLng} from "./api/weather";
 import 'dotenv/config'
+import {CDA, HTTC} from "./utils/locations";
+import getWBGTEmoji from "./utils/getWBGTEmoji";
 
 const bot = new Telegraf(process.env.BOT_ID!)
 

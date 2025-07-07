@@ -88,15 +88,7 @@ interface BaseResponse<T>{
     data: T;
 }
 
-export const CDA = {
-    latitude: 1.3659363,
-    longitude: 103.6898665
-}
 
-export const HTTC = {
-    latitude: 1.4063182,
-    longitude: 103.759932
-}
 
 /**
  * Read datetime for the latest WBGT data
@@ -273,22 +265,4 @@ export async function getAirTempFromLatLng(lat: number, lng: number): Promise<Ai
     // console.log(fnRes)
 
     return fnRes
-}
-
-/**
- * Get the WBGT emoji based on the heat stress level.
- * @param heatStress
- */
-export function getWBGTEmoji(heatStress: string): string {
-    const heatStressLower = heatStress.toLowerCase();
-
-    if (heatStressLower.includes("low")) {
-        return "🟢"; // Green for low heat stress
-    } else if (heatStressLower.includes("med")) {
-        return "🟡"; // Yellow for moderate heat stress
-    } else if (heatStressLower.includes("hi")) {
-        return "🔴"; // Red for very high heat stress
-    } else {
-        return "⚪"; // White for unknown or other cases
-    }
 }
