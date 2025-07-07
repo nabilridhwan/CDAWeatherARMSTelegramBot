@@ -133,8 +133,9 @@ bot.command("stop", async (ctx) => {
     }
 })
 
-bot.launch(() => {
+bot.launch(async () => {
     logger.info("Bot started successfully.")
+    logger.info(`No. of Subscribed Chat IDs: ${await redis.scard("subscribed_chat_ids")}`);
 })
 
 // Enable graceful stop
