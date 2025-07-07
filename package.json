@@ -4,7 +4,7 @@
   "main": "index.ts",
   "license": "MIT",
   "scripts": {
-    "start": "ts-node index.ts",
+    "start": "tsc && node dist/index.js",
     "build": "tsc",
     "test": "echo \"No tests specified\" && exit 0"
   },
