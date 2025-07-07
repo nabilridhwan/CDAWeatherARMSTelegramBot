@@ -40,7 +40,7 @@ const job = schedule.scheduleJob(rule, async (fireDate) => {
             .replaceAll(")", "\\)")
 
         const sendingChatPromises = await Promise.allSettled(
-            subscribedChatIds.map(chatId => bot.telegram.sendMessage(chatId, replacedReply).catch((err) => {
+            subscribedChatIds.map(chatId => bot.telegram.sendMessage(chatId, replacedReply, {parse_mode: "MarkdownV2"}).catch((err) => {
                 return bot.telegram.sendMessage(chatId, "Failed to fetch weather data. Try /weather command to get the latest data.");
             }))
         )
