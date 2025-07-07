@@ -17,7 +17,7 @@ bot.start((ctx) => {
             const httcWGBT = await getWGBTFromLatLng(HTTC.latitude, HTTC.longitude);
             const httcAirTemp = await getAirTempFromLatLng(HTTC.latitude, HTTC.longitude);
 
-            const reply = `*CDA*:\n🌡️ Heat Stress: ${cdaWGBT.heatStress} ${getWBGTEmoji(cdaWGBT.heatStress)}\n🌍 WBGT: ${cdaWGBT.wbgt} °C\n🌬️ Air Temp: ${cdaAirTemp.value} °C\n\n*HTTC*:\n🌡️ Heat Stress: ${httcWGBT.heatStress} ${getWBGTEmoji(httcWGBT.heatStress)}\n🌍 WBGT: ${httcWGBT.wbgt} °C\n🌬️ Air Temp: ${httcAirTemp.value} °C\n\nLast updated: ${new Date(cdaWGBT.dateTime).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}.\nJob date: ${new Date(fireDate).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}\nNext Update:${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}\nWeather data provided by the National Environment Agency (NEA) of Singapore.`
+            const reply = `*CDA*:\n🌡️ Heat Stress: ${cdaWGBT.heatStress} ${getWBGTEmoji(cdaWGBT.heatStress)}\n🌍 WBGT: ${cdaWGBT.wbgt} °C\n🌬️ Air Temp: ${cdaAirTemp.value} °C\n\n*HTTC*:\n🌡️ Heat Stress: ${httcWGBT.heatStress} ${getWBGTEmoji(httcWGBT.heatStress)}\n🌍 WBGT: ${httcWGBT.wbgt} °C\n🌬️ Air Temp: ${httcAirTemp.value} °C\n\nLast updated: ${new Date(cdaWGBT.dateTime).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}.\nJob date: ${new Date(fireDate).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}\nNext Update: ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`
 
             const replacedReply = reply
                 .replaceAll(".", "\\.")
@@ -47,7 +47,7 @@ bot.command("weather", async (ctx) => {
         const httcWGBT = await getWGBTFromLatLng(HTTC.latitude, HTTC.longitude);
         const httcAirTemp = await getAirTempFromLatLng(HTTC.latitude, HTTC.longitude);
 
-        const reply = `*CDA*:\n🌡️ Heat Stress: ${cdaWGBT.heatStress} ${getWBGTEmoji(cdaWGBT.heatStress)}\n🌍 WBGT: ${cdaWGBT.wbgt} °C\n🌬️ Air Temp: ${cdaAirTemp.value} °C\n\n*HTTC*:\n🌡️ Heat Stress: ${httcWGBT.heatStress} ${getWBGTEmoji(httcWGBT.heatStress)}\n🌍 WBGT: ${httcWGBT.wbgt} °C\n🌬️ Air Temp: ${httcAirTemp.value} °C\n\nLast updated: ${new Date(cdaWGBT.dateTime).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}\nWeather data provided by the National Environment Agency (NEA) of Singapore.`
+        const reply = `*CDA*:\n🌡️ Heat Stress: ${cdaWGBT.heatStress} ${getWBGTEmoji(cdaWGBT.heatStress)}\n🌍 WBGT: ${cdaWGBT.wbgt} °C\n🌬️ Air Temp: ${cdaAirTemp.value} °C\n\n*HTTC*:\n🌡️ Heat Stress: ${httcWGBT.heatStress} ${getWBGTEmoji(httcWGBT.heatStress)}\n🌍 WBGT: ${httcWGBT.wbgt} °C\n🌬️ Air Temp: ${httcAirTemp.value} °C\n\nLast updated: ${new Date(cdaWGBT.dateTime).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`
 
         const replacedReply = reply
             .replaceAll(".", "\\.")
