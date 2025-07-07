@@ -4,6 +4,7 @@ import {getAirTempFromLatLng, getWGBTFromLatLng} from "./api/weather";
 import 'dotenv/config'
 import {CDA, HTTC} from "./utils/locations";
 import getWBGTEmoji from "./utils/getWBGTEmoji";
+import logger from "./utils/logger";
 
 const bot = new Telegraf(process.env.BOT_ID!)
 
@@ -26,21 +27,24 @@ bot.start((ctx) => {
 
 
             await ctx.replyWithMarkdownV2(replacedReply)
-            console.log(`Weather report sent at ${new Date().toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`);
+            logger.info(`Weather report sent at ${new Date().toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`);
         } catch (error) {
-            console.error("Error fetching weather data:", error);
+            logger.error("Error fetching weather data:", error);
             ctx.reply("Failed to fetch weather data. Try /weather command to get the latest data.");
         }
     })
 
 
-    console.log("Scheduled job started to send weather report.")
+    logger.info(`Start command called by user: ${ctx.from.username}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`);
 })
 bot.help((ctx) => {
     ctx.reply("I can provide you with the weather data for CDA and HTTC for use with ARMS. Just type /start to begin.", )
 })
 
 bot.command("weather", async (ctx) => {
+
+    logger.info("Weather command called by user: " + ctx.from.username);
+
     try {
         const cdaWGBT = await getWGBTFromLatLng(CDA.latitude, CDA.longitude);
         const cdaAirTemp = await getAirTempFromLatLng(CDA.latitude, CDA.longitude);
@@ -57,17 +61,31 @@ bot.command("weather", async (ctx) => {
         await ctx.replyWithMarkdownV2(replacedReply)
 
     } catch (error) {
-        console.error("Error fetching weather data:", error);
+        logger.error("Error fetching weather data:", error);
         ctx.reply("Failed to fetch weather data. Try /weather command to get the latest data.");
     }
 })
 
 bot.launch(() => {
-    console.log("Bot started successfully.")
+    logger.info("Bot started successfully.")
 })
 
 // Enable graceful stop
-process.once('SIGINT', () => bot.stop('SIGINT'))
-process.once('SIGTERM', () => bot.stop('SIGTERM'))
+process.once('SIGINT', () => {
+    logger.info("Bot stopped gracefully.");
+    bot.stop('SIGINT');
+})
+
+process.once('SIGTERM', () => {
+    logger.info("Bot stopped gracefully.");
+    bot.stop('SIGTERM');
+})
+
+process.on('uncaughtException', (err) => {
+    logger.error('Uncaught Exception:', err);
+    // Log the error, perform cleanup, and potentially restart the application.
+    // It's crucial to exit the process after handling uncaught exceptions.
+    process.exit(1); // Exit with a non-zero code to indicate an error.
+});
 
 

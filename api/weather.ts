@@ -1,5 +1,6 @@
 import axios from 'axios'
 import haversine from 'haversine-distance'
+import logger from "../utils/logger";
 
 interface AirTempAPIResponse {
     readingType: string;
@@ -97,7 +98,7 @@ function getWBGT(){
     return axios.get<BaseResponse<WBGTAPIResponse>>("https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt")
         .then(response => response.data)
         .catch(error => {
-        console.error("Error fetching WBGT data:", error);
+        logger.error("Error fetching WBGT data:", error);
         throw error;
         });
 }
@@ -109,7 +110,7 @@ function getAirTemp(){
     return axios.get<BaseResponse<AirTempAPIResponse>>("https://api-open.data.gov.sg/v2/real-time/api/air-temperature")
         .then(response => response.data)
         .catch(error => {
-            console.error("Error fetching Air Temperature data:", error);
+            logger.error("Error fetching Air Temperature data:", error);
             throw error;
         });
 }
