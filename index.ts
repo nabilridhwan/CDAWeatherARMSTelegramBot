@@ -9,7 +9,14 @@ import redis from "./utils/redis";
 
 const bot = new Telegraf(process.env.BOT_ID!)
 
-const job = schedule.scheduleJob("*/5 * * * *", async (fireDate) => {
+// Cron rule to run every weekday at 09:45, 11:45, 13:45, and 15:45 in Singapore timezone
+const rule = new schedule.RecurrenceRule()
+rule.dayOfWeek = new schedule.Range(1, 5) // Monday to Friday
+rule.hour = [9, 11, 13, 15]
+rule.minute = 45
+rule.tz = "Singapore"
+
+const job = schedule.scheduleJob(rule, async (fireDate) => {
     try {
         let subscribedChatIds = await redis.smembers("subscribed_chat_ids");
 
@@ -133,16 +140,19 @@ bot.launch(() => {
 // Enable graceful stop
 process.once('SIGINT', () => {
     logger.info("Bot stopped gracefully.");
+    job.cancel();
     bot.stop('SIGINT');
 })
 
 process.once('SIGTERM', () => {
     logger.info("Bot stopped gracefully.");
+    job.cancel();
     bot.stop('SIGTERM');
 })
 
 process.on('uncaughtException', (err) => {
     logger.error('Uncaught Exception:', err);
+    job.cancel();
     // Log the error, perform cleanup, and potentially restart the application.
     // It's crucial to exit the process after handling uncaught exceptions.
     process.exit(1); // Exit with a non-zero code to indicate an error.
@@ -150,6 +160,7 @@ process.on('uncaughtException', (err) => {
 
 process.on('unhandledRejection', (err) => {
     logger.error('Unhandled Rejection:', err);
+    job.cancel();
     // Log the error, perform cleanup, and potentially restart the application.
     // It's crucial to exit the process after handling unhandled rejections.
     process.exit(1); // Exit with a non-zero code to indicate an error.
