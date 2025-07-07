@@ -135,14 +135,18 @@ bot.command("stop", async (ctx) => {
 })
 
 bot.command("/logs", async (ctx) => {
-    // Read logs from the logs/app.log file
-    const logs = await readFile("logs/app.log", "utf8")
-    logs.split("\n").slice(-12).join("\n")
-    ctx.reply("Here are the last 10 lines of the logs:\n" + logs.split("\n").slice(-10).join("\n"), {
-        parse_mode: "MarkdownV2",
-    })
+    logger.info("Logs command called by user: " + ctx.from.username);
+    try {
+        // Read logs from the logs/app.log file
+        const logs = await readFile("logs/app.log", "utf8")
+        logs.split("\n").slice(-12).join("\n")
+        await ctx.reply("Here are the last 10 lines of the logs:\n" + logs.split("\n").slice(-10).join("\n"))
+        logger.info("Sent logs to user: " + ctx.from.username + " (ID: " + ctx.from.id + ") in chat ID: " + ctx.chat.id);
+    } catch (error) {
+        logger.error("Error reading logs:", error);
+        await ctx.reply("Failed to read logs. Please try again later.");
+    }
 })
-
 
 
 bot.launch(async () => {
