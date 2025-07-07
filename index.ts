@@ -134,7 +134,7 @@ bot.command("stop", async (ctx) => {
     }
 })
 
-bot.command("/logs", async (ctx) => {
+bot.command("logs", async (ctx) => {
     logger.info("Logs command called by user: " + ctx.from.username);
     try {
         // Read logs from the logs/app.log file
