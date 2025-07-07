@@ -26,6 +26,7 @@ bot.start((ctx) => {
 
 
             await ctx.replyWithMarkdownV2(replacedReply)
+            console.log(`Weather report sent at ${new Date().toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`);
         } catch (error) {
             console.error("Error fetching weather data:", error);
             ctx.reply("Failed to fetch weather data. Try /weather command to get the latest data.");
