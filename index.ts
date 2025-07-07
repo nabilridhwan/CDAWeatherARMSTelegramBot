@@ -6,6 +6,7 @@ import {CDA, HTTC} from "./utils/locations";
 import getWBGTEmoji from "./utils/getWBGTEmoji";
 import logger from "./utils/logger";
 import redis from "./utils/redis";
+import {readFile} from 'node:fs/promises'
 
 const bot = new Telegraf(process.env.BOT_ID!)
 
@@ -132,6 +133,17 @@ bot.command("stop", async (ctx) => {
         logger.info(`No. of Subscribed Chat IDs: ${await redis.scard("subscribed_chat_ids")}`);
     }
 })
+
+bot.command("/logs", async (ctx) => {
+    // Read logs from the logs/app.log file
+    const logs = await readFile("logs/app.log", "utf8")
+    logs.split("\n").slice(-12).join("\n")
+    ctx.reply("Here are the last 10 lines of the logs:\n" + logs.split("\n").slice(-10).join("\n"), {
+        parse_mode: "MarkdownV2",
+    })
+})
+
+
 
 bot.launch(async () => {
     logger.info("Bot started successfully.")
