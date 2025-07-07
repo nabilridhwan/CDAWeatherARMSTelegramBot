@@ -8,10 +8,11 @@ import logger from "./utils/logger";
 
 const bot = new Telegraf(process.env.BOT_ID!)
 
-bot.start((ctx) => {
-    ctx.reply("Welcome 👋🏻\nYou're all set to receive weather updates for CDA and HTTC.\nI will send it at: 0945, 1145, 1345 and 1545 only on Weekdays.\nYou can also use the /weather command to get the latest weather data on demand.")
+let subscribedChatIds: number[] = [];
 
-    const job = schedule.scheduleJob("45 9-15/2 * * 1-5", async (fireDate) => {
+
+const job = schedule.scheduleJob("45 9-15/2 * * 1-5", async (fireDate) => {
+    for (let chatId of subscribedChatIds) {
         try {
             const cdaWGBT = await getWGBTFromLatLng(CDA.latitude, CDA.longitude);
             const cdaAirTemp = await getAirTempFromLatLng(CDA.latitude, CDA.longitude);
@@ -25,25 +26,43 @@ bot.start((ctx) => {
                 .replaceAll("(", "\\(")
                 .replaceAll(")", "\\)")
 
-
-            await ctx.replyWithMarkdownV2(replacedReply)
-            logger.info(`Weather report sent at ${new Date().toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`);
+            await bot.telegram.sendMessage(chatId, replacedReply, {parse_mode: "MarkdownV2"});
+            logger.info(`Weather report sent to chat ID: ${chatId} at ${new Date().toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`);
         } catch (error) {
             logger.error("Error fetching weather data:", error);
-            ctx.reply("Failed to fetch weather data. Try /weather command to get the latest data.");
+            await bot.telegram.sendMessage(chatId, "Failed to fetch weather data. Try /weather command to get the latest data.");
         }
-    })
-
-
-    logger.info(`Start command called by user: ${ctx.from.username}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`);
+    }
 })
+
+bot.start((ctx) => {
+
+    const isChatSubscribed = subscribedChatIds.includes(ctx.chat.id);
+
+    if(isChatSubscribed){
+        ctx.reply(`Welcome back 👋🏻
+You're already subscribed to receive weather updates for CDA and HTTC.
+Next update: ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}
+You can also use the /weather command to get the latest weather data on demand.`)
+    }else{
+
+
+    ctx.reply("Welcome 👋🏻\nYou're all set to receive weather updates for CDA and HTTC.\nI will send it at: 09:45, 11:45, 13:45 and 15:45 only on Weekdays.\nYou can also use the /weather command to get the latest weather data on demand.")
+    }
+
+    subscribedChatIds = [...new Set([...subscribedChatIds, ctx.chat.id])]; // Add the chat ID to the list if it's not already present
+
+    logger.info(`Start command called by Chat ID: ${ctx.chat.id}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`);
+    logger.info(`No. of Subscribed Chat IDs: ${subscribedChatIds.length}`)
+})
+
 bot.help((ctx) => {
-    ctx.reply("I can provide you with the weather data for CDA and HTTC for use with ARMS. Just type /start to begin.", )
+    ctx.reply("I can provide you with the weather data for CDA and HTTC for use with ARMS. Just type /start to begin.",)
 })
 
 bot.command("weather", async (ctx) => {
 
-    logger.info("Weather command called by user: " + ctx.from.username);
+    logger.info("Weather command called by user: " + ctx.from.username + " (ID: " + ctx.from.id + ") in chat ID: " + ctx.chat.id);
 
     try {
         const cdaWGBT = await getWGBTFromLatLng(CDA.latitude, CDA.longitude);
@@ -59,6 +78,8 @@ bot.command("weather", async (ctx) => {
             .replaceAll(")", "\\)")
 
         await ctx.replyWithMarkdownV2(replacedReply)
+
+        logger.info("Weather data sent to user: " + ctx.from.username + " (ID: " + ctx.from.id + ") in chat ID: " + ctx.chat.id);
 
     } catch (error) {
         logger.error("Error fetching weather data:", error);
