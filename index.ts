@@ -5,13 +5,12 @@ import 'dotenv/config'
 import {CDA, HTTC} from "./utils/locations";
 import getWBGTEmoji from "./utils/getWBGTEmoji";
 import logger from "./utils/logger";
+import redis from "./utils/redis";
 
 const bot = new Telegraf(process.env.BOT_ID!)
 
-let subscribedChatIds: number[] = [];
-
-
 const job = schedule.scheduleJob("45 9-15/2 * * 1-5", async (fireDate) => {
+    let subscribedChatIds = await redis.smembers("subscribed_chat_ids");
     for (let chatId of subscribedChatIds) {
         try {
             const cdaWGBT = await getWGBTFromLatLng(CDA.latitude, CDA.longitude);
@@ -35,9 +34,9 @@ const job = schedule.scheduleJob("45 9-15/2 * * 1-5", async (fireDate) => {
     }
 })
 
-bot.start((ctx) => {
+bot.start(async (ctx) => {
 
-    const isChatSubscribed = subscribedChatIds.includes(ctx.chat.id);
+    const isChatSubscribed = await redis.sismember("subscribed_chat_ids", ctx.chat.id);
 
     if (isChatSubscribed) {
         ctx.reply(`Welcome back 👋🏻
@@ -50,10 +49,10 @@ You can also use the /weather command to get the latest weather data on demand.`
         ctx.reply("Welcome 👋🏻\nYou're all set to receive weather updates for CDA and HTTC.\nI will send it at: 09:45, 11:45, 13:45 and 15:45 only on Weekdays.\nYou can also use the /weather command to get the latest weather data on demand.")
     }
 
-    subscribedChatIds = [...new Set([...subscribedChatIds, ctx.chat.id])]; // Add the chat ID to the list if it's not already present
+    await redis.sadd("subscribed_chat_ids", ctx.chat.id);
 
     logger.info(`Start command called by Chat ID: ${ctx.chat.id}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`);
-    logger.info(`No. of Subscribed Chat IDs: ${subscribedChatIds.length}`)
+    logger.info(`No. of Subscribed Chat IDs: ${await redis.scard("subscribed_chat_ids")}`);
 })
 
 bot.help((ctx) => {
@@ -87,22 +86,22 @@ bot.command("weather", async (ctx) => {
     }
 })
 
-bot.command("stop", (ctx) => {
+bot.command("stop", async (ctx) => {
     const chatId = ctx.chat.id;
 
-    const isChatSubscribed = subscribedChatIds.includes(chatId);
+    const isChatSubscribed = await redis.sismember("subscribed_chat_ids", chatId);
 
     if (!isChatSubscribed) {
 
         ctx.reply("You are not subscribed to weather updates. Use /start to subscribe.");
         logger.info(`Stop command called by Chat ID: ${chatId}. No action taken as the chat is not subscribed.`);
-        logger.info(`No. of Subscribed Chat IDs: ${subscribedChatIds.length}`);
+        logger.info(`No. of Subscribed Chat IDs: ${await redis.scard("subscribed_chat_ids")}`);
         return;
     } else {
-        subscribedChatIds = subscribedChatIds.filter(id => id !== chatId);
+        await redis.srem("subscribed_chat_ids", chatId);
         ctx.reply("You have been unsubscribed from weather updates. Use /start to subscribe again.");
         logger.info(`Stop command called by Chat ID: ${chatId}.`);
-        logger.info(`No. of Subscribed Chat IDs: ${subscribedChatIds.length}`);
+        logger.info(`No. of Subscribed Chat IDs: ${await redis.scard("subscribed_chat_ids")}`);
     }
 })
 
@@ -128,4 +127,9 @@ process.on('uncaughtException', (err) => {
     process.exit(1); // Exit with a non-zero code to indicate an error.
 });
 
-
+process.on('unhandledRejection', (err) => {
+    logger.error('Unhandled Rejection:', err);
+    // Log the error, perform cleanup, and potentially restart the application.
+    // It's crucial to exit the process after handling unhandled rejections.
+    process.exit(1); // Exit with a non-zero code to indicate an error.
+})
