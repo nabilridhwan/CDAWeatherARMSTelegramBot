@@ -39,15 +39,15 @@ bot.start((ctx) => {
 
     const isChatSubscribed = subscribedChatIds.includes(ctx.chat.id);
 
-    if(isChatSubscribed){
+    if (isChatSubscribed) {
         ctx.reply(`Welcome back 👋🏻
 You're already subscribed to receive weather updates for CDA and HTTC.
 Next update: ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}
 You can also use the /weather command to get the latest weather data on demand.`)
-    }else{
+    } else {
 
 
-    ctx.reply("Welcome 👋🏻\nYou're all set to receive weather updates for CDA and HTTC.\nI will send it at: 09:45, 11:45, 13:45 and 15:45 only on Weekdays.\nYou can also use the /weather command to get the latest weather data on demand.")
+        ctx.reply("Welcome 👋🏻\nYou're all set to receive weather updates for CDA and HTTC.\nI will send it at: 09:45, 11:45, 13:45 and 15:45 only on Weekdays.\nYou can also use the /weather command to get the latest weather data on demand.")
     }
 
     subscribedChatIds = [...new Set([...subscribedChatIds, ctx.chat.id])]; // Add the chat ID to the list if it's not already present
@@ -84,6 +84,25 @@ bot.command("weather", async (ctx) => {
     } catch (error) {
         logger.error("Error fetching weather data:", error);
         ctx.reply("Failed to fetch weather data. Try /weather command to get the latest data.");
+    }
+})
+
+bot.command("stop", (ctx) => {
+    const chatId = ctx.chat.id;
+
+    const isChatSubscribed = subscribedChatIds.includes(chatId);
+
+    if (!isChatSubscribed) {
+
+        ctx.reply("You are not subscribed to weather updates. Use /start to subscribe.");
+        logger.info(`Stop command called by Chat ID: ${chatId}. No action taken as the chat is not subscribed.`);
+        logger.info(`No. of Subscribed Chat IDs: ${subscribedChatIds.length}`);
+        return;
+    } else {
+        subscribedChatIds = subscribedChatIds.filter(id => id !== chatId);
+        ctx.reply("You have been unsubscribed from weather updates. Use /start to subscribe again.");
+        logger.info(`Stop command called by Chat ID: ${chatId}.`);
+        logger.info(`No. of Subscribed Chat IDs: ${subscribedChatIds.length}`);
     }
 })
 
