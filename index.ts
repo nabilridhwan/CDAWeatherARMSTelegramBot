@@ -10,11 +10,11 @@ import {readFile} from 'node:fs/promises'
 
 const bot = new Telegraf(process.env.BOT_ID!)
 
-// Cron rule to run every weekday at 09:45, 11:45, 13:45, and 15:45 in Singapore timezone
+// Cron rule to run every weekday at 09:50, 11:50, 13:50, and 15:50 in Singapore timezone
 const rule = new schedule.RecurrenceRule()
 rule.dayOfWeek = new schedule.Range(1, 5) // Monday to Friday
 rule.hour = [9, 11, 13, 15]
-rule.minute = 45
+rule.minute = 50
 rule.tz = "Singapore"
 
 const job = schedule.scheduleJob(rule, async (fireDate) => {
@@ -66,14 +66,30 @@ bot.start(async (ctx) => {
     const isChatSubscribed = await redis.sismember("subscribed_chat_ids", ctx.chat.id);
 
     if (isChatSubscribed) {
-        ctx.reply(`Welcome back 👋🏻
+        ctx.reply(`Welcome back 👋🏻👍🏻
+        
 You're already subscribed to receive weather updates for CDA and HTTC.
+
+You can also use the /weather command to get the latest weather data on demand.
+
+Reply with /stop to unsubscribe from the weather updates.
+
 Next update: ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}
-You can also use the /weather command to get the latest weather data on demand.`)
+`)
     } else {
 
 
-        ctx.reply("Welcome 👋🏻\nYou're all set to receive weather updates for CDA and HTTC.\nI will send it at: 09:45, 11:45, 13:45 and 15:45 only on Weekdays.\nYou can also use the /weather command to get the latest weather data on demand.")
+        ctx.reply(`Welcome 👋🏻
+
+You're now subscribed to receive weather updates for CDA and HTTC.
+
+Weather reports will be sent automatically every weekday at 09:50, 11:50, 13:50, and 15:50 Singapore time.
+
+You can also use the /weather command to get the latest weather data on demand.
+
+Reply with /stop to unsubscribe from the weather updates.
+`)
+
     }
 
     await redis.sadd("subscribed_chat_ids", ctx.chat.id);
