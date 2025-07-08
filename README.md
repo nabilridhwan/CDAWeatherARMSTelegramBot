@@ -8,16 +8,17 @@
 ## Features
 
 - Provides weather information for CDA and HTTC.
-- Sends weather updates at 09:50, 11:50, 13:50 and 15:50 on weekdays.
+- Sends weather updates at 09:50 till 15:50, every 2 hours on weekdays.
 - Uses the same weather data from myENV app.
 - Get instant weather updates by sending `/weather` command.
+- Webhook based architecture for efficient updates and minimal resource usage. Also allows for scaling to multiple instances if needed under load.
 
 ## Technologies Used
 
 - Node.js
-- Redis
+- Redis (via Upstash)
 - Telegram Bot API (via Telegraf)
-- Fly.io (Deployed on)
+- Fly.io (Deployment platform)
 
 ## APIs Used
 
