@@ -175,7 +175,7 @@ bot.command("logs", async (ctx) => {
     }
 })
 
-bot.telegram.setWebhook(`${process.env.HOST || 'http://localhost:3000'}/telegram-webhook`)
+bot.telegram.setWebhook(`${process.env.HOST || 'http://localhost:8080'}/telegram-webhook`)
 app.use(bot.webhookCallback('/telegram-webhook'))
 
 app.get("/logs", async (req: Request, res: Response) => {
@@ -200,8 +200,8 @@ app.get("/health", (req: any, res: any) => {
 })
 
 // Run the server!
-app.listen(process.env.PORT || 3000, () => {
-    logger.info(`Server is running on port ${process.env.PORT || 3000}`);
+app.listen(process.env.PORT || 8080, () => {
+    logger.info(`Server is running on port ${process.env.PORT || 8080}`);
 })
 
 
