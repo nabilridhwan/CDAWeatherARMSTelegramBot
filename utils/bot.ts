@@ -63,10 +63,13 @@ export const job = schedule.scheduleJob(rule, async (fireDate) => {
 bot.start(async (ctx) => {
     logger.info(`Start command called by Chat ID: ${ctx.chat.id}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`);
 
-    const isChatSubscribed = await redis.sismember("subscribed_chat_ids", ctx.chat.id);
+    const [loadingMessage, isChatSubscribed] = await Promise.all([
+        await ctx.reply("⏳ Loading..."),
+        await redis.sismember("subscribed_chat_ids", ctx.chat.id)
+    ])
 
     if (isChatSubscribed) {
-        ctx.reply(`Welcome back 👋🏻👍🏻
+        const msg = `Welcome back 👋🏻👍🏻
         
 You're already subscribed to receive weather updates for CDA and HTTC.
 
@@ -74,14 +77,20 @@ You can also use the /weather command to get the latest weather data on demand.
 
 Reply with /stop to unsubscribe from the weather updates.
 
-Next update: ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}
-`)
+Next update: ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`
+
+        ctx.telegram.editMessageText(
+            ctx.chat.id,
+            loadingMessage.message_id,
+            undefined,
+            msg,
+        )
 
         logger.info("Chat ID: " + ctx.chat.id + " is already subscribed. No action taken.");
-    } else {
+        return;
+    }
 
-
-        ctx.reply(`Welcome 👋🏻
+    const msg = `Welcome 👋🏻
 
 You're now subscribed to receive weather updates for CDA and HTTC.
 
@@ -89,13 +98,18 @@ Weather reports will be sent automatically every weekday at 09:50, 11:50, 13:50,
 
 You can also use the /weather command to get the latest weather data on demand.
 
-Reply with /stop to unsubscribe from the weather updates.
-`)
+Reply with /stop to unsubscribe from the weather updates.`
 
-        await redis.sadd("subscribed_chat_ids", ctx.chat.id);
-        logger.info("Adding Chat ID: " + ctx.chat.id + " to subscribed chat IDs.");
+    await redis.sadd("subscribed_chat_ids", ctx.chat.id);
 
-    }
+    ctx.telegram.editMessageText(
+        ctx.chat.id,
+        loadingMessage.message_id,
+        undefined,
+        msg,
+    )
+
+    logger.info("Added Chat ID: " + ctx.chat.id + " to subscribed chat IDs.");
 
     logger.info(`No. of Subscribed Chat IDs: ${await redis.scard("subscribed_chat_ids")}`);
 })
@@ -113,6 +127,8 @@ bot.command("weather", async (ctx) => {
 
     logger.info("Weather command called by user: " + ctx.from.username + " (ID: " + ctx.from.id + ") in chat ID: " + ctx.chat.id);
 
+    const loadingMessage = await ctx.reply("⏳ Loading...")
+
     try {
         const [cdaWBGT, cdaAirTemp, httcWBGT, httcAirTemp] = await Promise.all([
             getWGBTFromLatLng(CDA.latitude, CDA.longitude),
@@ -128,32 +144,58 @@ bot.command("weather", async (ctx) => {
             .replaceAll("(", "\\(")
             .replaceAll(")", "\\)")
 
-        await ctx.replyWithMarkdownV2(replacedReply)
+
+        await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            loadingMessage.message_id,
+            undefined,
+            replacedReply,
+            {parse_mode: "MarkdownV2"}
+        )
 
         logger.info("Weather data sent to user: " + ctx.from.username + " (ID: " + ctx.from.id + ") in chat ID: " + ctx.chat.id);
 
     } catch (error) {
         logger.error("Error fetching weather data:", error);
-        ctx.reply("Failed to fetch weather data. Try /weather command to get the latest data.");
+        await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            loadingMessage.message_id,
+            undefined,
+            "Failed to fetch weather data. Try /weather command to get the latest data."
+        )
     }
 })
 
 bot.command("stop", async (ctx) => {
     const chatId = ctx.chat.id;
 
-    const isChatSubscribed = await redis.sismember("subscribed_chat_ids", chatId);
+    const [loadingMessage, isChatSubscribed] = await Promise.all([
+        await ctx.reply("⏳ Loading..."),
+        await redis.sismember("subscribed_chat_ids", ctx.chat.id)
+    ])
 
     if (!isChatSubscribed) {
-        ctx.reply("You are not subscribed to weather updates. Use /start to subscribe.");
+        await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            loadingMessage.message_id,
+            undefined,
+            "You are not subscribed to weather updates. Use /start to subscribe."
+        )
         logger.info(`Stop command called by Chat ID: ${chatId}. No action taken as the chat is not subscribed.`);
         logger.info(`No. of Subscribed Chat IDs: ${await redis.scard("subscribed_chat_ids")}`);
         return;
-    } else {
-        await redis.srem("subscribed_chat_ids", chatId);
-        ctx.reply("You have been unsubscribed from weather updates. Use /start to subscribe again.");
-        logger.info(`Stop command called by Chat ID: ${chatId}.`);
-        logger.info(`No. of Subscribed Chat IDs: ${await redis.scard("subscribed_chat_ids")}`);
     }
+
+    await redis.srem("subscribed_chat_ids", chatId);
+    await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        loadingMessage.message_id,
+        undefined,
+        "You have been unsubscribed from weather updates. Use /start to subscribe to the updates again."
+    )
+
+    logger.info(`Stop command called by Chat ID: ${chatId}.`);
+    logger.info(`No. of Subscribed Chat IDs: ${await redis.scard("subscribed_chat_ids")}`);
 })
 
 bot.command("logs", async (ctx) => {
