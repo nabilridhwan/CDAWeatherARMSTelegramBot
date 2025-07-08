@@ -195,6 +195,7 @@ app.get("/health", (req: any, res: any) => {
         status: "ok",
         message: "Bot is running and healthy.",
         host: process.env.HOST,
+        subscribedChatCount: redis.scard("subscribed_chat_ids"),
         nextUpdate: job.nextInvocation() ? job.nextInvocation().toLocaleString('en-SG', {timeZone: 'Asia/Singapore'}) : "No scheduled updates."
     })
 })
