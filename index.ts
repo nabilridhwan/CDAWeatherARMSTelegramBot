@@ -7,6 +7,10 @@ import getWBGTEmoji from "./utils/getWBGTEmoji";
 import logger from "./utils/logger";
 import redis from "./utils/redis";
 import {readFile} from 'node:fs/promises'
+import express,{ type Request, type Response } from 'express';
+
+const app = express()
+
 
 const bot = new Telegraf(process.env.BOT_ID!)
 
@@ -171,11 +175,40 @@ bot.command("logs", async (ctx) => {
     }
 })
 
+bot.telegram.setWebhook(`${process.env.HOST || 'http://localhost:3000'}/telegram-webhook`)
+app.use(bot.webhookCallback('/telegram-webhook'))
 
-bot.launch(async () => {
-    logger.info("Bot started successfully.")
-    logger.info(`No. of Subscribed Chat IDs: ${await redis.scard("subscribed_chat_ids")}`);
+app.get("/logs", async (req: Request, res: Response) => {
+    try {
+        // Read logs from the logs/app.log file
+        const logs = await readFile("logs/app.log", "utf8")
+        const logsByLines = logs.split("\n").filter(l => !!l)
+        res.json(logsByLines)
+    } catch (error) {
+        logger.error("Error reading logs:", error);
+        res.status(500).send("Failed to read logs. Please try again later.");
+    }
 })
+
+app.get("/health", (req: any, res: any) => {
+    return res.status(200).json({
+        status: "ok",
+        message: "Bot is running and healthy.",
+        host: process.env.HOST,
+        nextUpdate: job.nextInvocation() ? job.nextInvocation().toLocaleString('en-SG', {timeZone: 'Asia/Singapore'}) : "No scheduled updates."
+    })
+})
+
+// Run the server!
+app.listen(process.env.PORT || 3000, () => {
+    logger.info(`Server is running on port ${process.env.PORT || 3000}`);
+})
+
+
+// bot.launch(async () => {
+//     logger.info("Bot started successfully.")
+//     logger.info(`No. of Subscribed Chat IDs: ${await redis.scard("subscribed_chat_ids")}`);
+// })
 
 // Enable graceful stop
 process.once('SIGINT', () => {
