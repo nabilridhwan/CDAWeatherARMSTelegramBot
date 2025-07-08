@@ -12,6 +12,7 @@
 - Uses the same weather data from myENV app.
 - Get instant weather updates by sending `/weather` command.
 - Webhook based architecture for efficient updates and minimal resource usage. Also allows for scaling to multiple instances if needed under load.
+- Secure webhook endpoint with a secret token, generated at runtime, to prevent unauthorized access.
 
 ## Technologies Used
 
