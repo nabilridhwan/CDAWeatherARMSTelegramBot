@@ -17,7 +17,7 @@ primary_region = 'sin'
 [[vm]]
   size = 'shared-cpu-1x'
   cpu_kind = 'shared'
-  memory = '256mb'
+  memory = '512mb'
   cpus = 1
 
 [[restart]]
