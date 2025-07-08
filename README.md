@@ -1,11 +1,12 @@
 # CDA Weather ARMS Telegram Bot
-> A Telegram bot that provides weather information for CDA and HTTC at 09:45, 11:45, 13:45 and 15:45 on Weekdays.
+> A Telegram bot that provides weather information for CDA and HTTC
 
-<img src="docs/weather.png" width="300" />
+<img src="docs/welcome.png" width="300" />
+<img src="docs/weather-update.png" width="300" />
 
 ## Features
 - Provides weather information for CDA and HTTC.
-- Sends weather updates at 09:45, 11:45, 13:45 and 15:45 on weekdays.
+- Sends weather updates at 09:50, 11:50, 13:50 and 15:50 on weekdays.
 - Uses the same weather data from myENV app.
 - Get instant weather updates by sending `/weather` command.
 
