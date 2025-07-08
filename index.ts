@@ -62,6 +62,7 @@ const job = schedule.scheduleJob(rule, async (fireDate) => {
 })
 
 bot.start(async (ctx) => {
+    logger.info(`Start command called by Chat ID: ${ctx.chat.id}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`);
 
     const isChatSubscribed = await redis.sismember("subscribed_chat_ids", ctx.chat.id);
 
@@ -76,6 +77,8 @@ Reply with /stop to unsubscribe from the weather updates.
 
 Next update: ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}
 `)
+
+        logger.info("Chat ID: " + ctx.chat.id + " is already subscribed. No action taken.");
     } else {
 
 
@@ -90,11 +93,11 @@ You can also use the /weather command to get the latest weather data on demand.
 Reply with /stop to unsubscribe from the weather updates.
 `)
 
+        await redis.sadd("subscribed_chat_ids", ctx.chat.id);
+        logger.info("Adding Chat ID: " + ctx.chat.id + " to subscribed chat IDs.");
+
     }
 
-    await redis.sadd("subscribed_chat_ids", ctx.chat.id);
-
-    logger.info(`Start command called by Chat ID: ${ctx.chat.id}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', {timeZone: 'Asia/Singapore'})}`);
     logger.info(`No. of Subscribed Chat IDs: ${await redis.scard("subscribed_chat_ids")}`);
 })
 
