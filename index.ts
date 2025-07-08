@@ -37,12 +37,12 @@ app.get("/logs", async (req: Request, res: Response) => {
     }
 })
 
-app.get("/health", (req: any, res: any) => {
+app.get("/health", async (req: any, res: any) => {
     return res.status(200).json({
         status: "ok",
         message: "Bot is running and healthy.",
         host: process.env.HOST,
-        subscribedChatCount: redis.scard("subscribed_chat_ids"),
+        subscribedChatCount: await redis.scard("subscribed_chat_ids"),
         nextUpdate: job.nextInvocation() ? job.nextInvocation().toLocaleString('en-SG', {timeZone: 'Asia/Singapore'}) : "No scheduled updates."
     })
 })
