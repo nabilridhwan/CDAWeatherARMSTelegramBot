@@ -12,6 +12,7 @@
     "@types/express": "^5.0.3",
     "@types/node": "^24.0.10",
     "@types/node-schedule": "^2.1.7",
+    "prettier": "3.6.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   },
