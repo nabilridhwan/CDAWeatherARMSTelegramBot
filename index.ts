@@ -102,7 +102,12 @@ Reply with /stop to unsubscribe from the weather updates.
 })
 
 bot.help((ctx) => {
-    ctx.reply("I can provide you with the weather data for CDA and HTTC for use with ARMS. Just type /start to begin.",)
+    ctx.reply(`This bot provides you with the weather data for CDA and HTTC for use with ARMS.
+It'll send you updates automatically every weekday at 09:50, 11:50, 13:50, and 15:50 Singapore time every weekday.
+
+Just type /start to begin.
+If you want to stop receiving updates, type /stop.
+    `)
 })
 
 bot.command("weather", async (ctx) => {
@@ -140,7 +145,6 @@ bot.command("stop", async (ctx) => {
     const isChatSubscribed = await redis.sismember("subscribed_chat_ids", chatId);
 
     if (!isChatSubscribed) {
-
         ctx.reply("You are not subscribed to weather updates. Use /start to subscribe.");
         logger.info(`Stop command called by Chat ID: ${chatId}. No action taken as the chat is not subscribed.`);
         logger.info(`No. of Subscribed Chat IDs: ${await redis.scard("subscribed_chat_ids")}`);
