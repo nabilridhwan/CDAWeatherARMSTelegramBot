@@ -108,12 +108,20 @@ bot.start(async (ctx) => {
     redis.sismember('subscribed_chat_ids_rota_3', ctx.chat.id),
   ]);
 
-  if (isChatSubscribed) {
-    const msg = `Welcome back 👋🏻👍🏻
+  const hasSubscribedToAnyChat =
+    isChatSubscribed == 1 ||
+    isSubscribedToRota1 == 1 ||
+    isSubscribedToRota2 == 1 ||
+    isSubscribedToRota3 == 1;
+
+  if (hasSubscribedToAnyChat) {
+    const msg = `Welcome back 👋🏻
         
 You're already subscribed to receive weather updates for CDA and HTTC.
 
-You can also use the /weather command to get the latest weather data on demand.
+You are currently subscribed to: ${isSubscribedToRota1 ? 'Rota 1' : isSubscribedToRota2 ? 'Rota 2' : isSubscribedToRota3 ? 'Rota 3' : 'All Weekdays'} and will receive notifications accordingly.
+
+You may use the /weather command to get the latest weather data on demand.
 
 Reply with /stop to unsubscribe from the weather updates.
 
@@ -140,7 +148,7 @@ Weather reports will be sent automatically every weekday at 09:50, 11:50, 13:50,
 
 You can also use the /weather command to get the latest weather data on demand.
 
-You can also set your rota using /setrota command to receive the alerts on your rota days.
+You can also set your rota using /setrota command (e.g. /setrota 1) to receive the alerts on your rota working shifts.
 
 Reply with /stop to unsubscribe from the weather updates.`;
 
@@ -154,10 +162,10 @@ Reply with /stop to unsubscribe from the weather updates.`;
   );
 
   logger.info('Added Chat ID: ' + ctx.chat.id + ' to subscribed chat IDs.');
-
-  logger.info(
-    `No. of Subscribed Chat IDs: ${await redis.scard('subscribed_chat_ids')}`,
-  );
+  //
+  // logger.info(
+  //   `No. of Subscribed Chat IDs: ${await redis.scard('subscribed_chat_ids')}`,
+  // );
 });
 
 bot.command('setrota', async (ctx) => {
