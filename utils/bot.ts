@@ -6,6 +6,7 @@ import { getAirTempFromLatLng, getWGBTFromLatLng } from '../api/weather';
 import { CDA, HTTC } from './locations';
 import getWBGTEmoji from './getWBGTEmoji';
 import { readFile } from 'node:fs/promises';
+import getRotaNumber from './getRotaNumber';
 
 export const bot = new Telegraf(process.env.BOT_ID!);
 
@@ -18,7 +19,22 @@ rule.tz = 'Singapore';
 
 export const job = schedule.scheduleJob(rule, async (fireDate) => {
   try {
-    let subscribedChatIds = await redis.smembers('subscribed_chat_ids');
+    let subscribedChatIds: string[] = [
+      ...(await redis.smembers('subscribed_chat_ids')),
+    ];
+
+    // Attempt to get all members (if they have not set rota)
+    // Get the rota number for today and make sure it is in GMT+8 timezone
+    const rotaNumber = getRotaNumber(fireDate);
+
+    // Attempt to get all members in the rota set
+    subscribedChatIds = [
+      ...subscribedChatIds,
+      ...(await redis.smembers(`subscribed_chat_ids_rota_${rotaNumber}`)),
+    ];
+
+    // Remove duplicates by converting to a Set and back to an Array
+    subscribedChatIds = Array.from(new Set(subscribedChatIds));
 
     if (subscribedChatIds.length === 0) {
       logger.info('No subscribed chat IDs found. Skipping weather report.');
@@ -78,9 +94,18 @@ bot.start(async (ctx) => {
     `Start command called by Chat ID: ${ctx.chat.id}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', { timeZone: 'Asia/Singapore' })}`,
   );
 
-  const [loadingMessage, isChatSubscribed] = await Promise.all([
-    await ctx.reply('⏳ Loading...'),
-    await redis.sismember('subscribed_chat_ids', ctx.chat.id),
+  const [
+    loadingMessage,
+    isChatSubscribed,
+    isSubscribedToRota1,
+    isSubscribedToRota2,
+    isSubscribedToRota3,
+  ] = await Promise.all([
+    ctx.reply('⏳ Loading...'),
+    redis.sismember('subscribed_chat_ids', ctx.chat.id),
+    redis.sismember('subscribed_chat_ids_rota_1', ctx.chat.id),
+    redis.sismember('subscribed_chat_ids_rota_2', ctx.chat.id),
+    redis.sismember('subscribed_chat_ids_rota_3', ctx.chat.id),
   ]);
 
   if (isChatSubscribed) {
@@ -115,6 +140,8 @@ Weather reports will be sent automatically every weekday at 09:50, 11:50, 13:50,
 
 You can also use the /weather command to get the latest weather data on demand.
 
+You can also set your rota using /setrota command to receive the alerts on your rota days.
+
 Reply with /stop to unsubscribe from the weather updates.`;
 
   await redis.sadd('subscribed_chat_ids', ctx.chat.id);
@@ -133,11 +160,57 @@ Reply with /stop to unsubscribe from the weather updates.`;
   );
 });
 
+bot.command('setrota', async (ctx) => {
+  const args = ctx.message.text.split(' ').slice(1);
+
+  const rotaStr = args[0];
+
+  if (!rotaStr || isNaN(rotaStr as any)) {
+    ctx.reply(
+      'Please provide a valid rota number (1, 2, or 3). Example: /setrota 1',
+    );
+    return;
+  }
+
+  const rota = parseInt(rotaStr, 10);
+
+  if (![1, 2, 3].includes(rota)) {
+    ctx.reply(
+      'Invalid rota number. Please provide a valid rota number (1, 2, or 3). Example: /setrota 1',
+    );
+    return;
+  }
+
+  // remove from other rota sets
+  await Promise.all([
+    redis.srem('subscribed_chat_ids_rota_1', ctx.chat.id),
+    redis.srem('subscribed_chat_ids_rota_2', ctx.chat.id),
+    redis.srem('subscribed_chat_ids_rota_3', ctx.chat.id),
+    redis.srem('subscribed_chat_ids', ctx.chat.id),
+  ]).catch((err) => {
+    logger.error(`Failed to remove chat ID from other rota sets: ${err}`);
+    ctx.reply(
+      'An error occurred while setting your rota. Please try again later.',
+    );
+    return;
+  });
+
+  // add to the selected rota set
+  await redis.sadd(`subscribed_chat_ids_rota_${rota}`, ctx.chat.id);
+  ctx.reply(
+    `Your rota has been set to Rota ${rota}. You will receive weather updates on your rota days. If you want to receive updates every weekday, please use /start command to subscribe without setting a rota.`,
+  );
+  logger.info(`Set Chat ID: ${ctx.chat.id} to Rota ${rota}.`);
+});
+
 bot.help((ctx) => {
   ctx.reply(`This bot provides you with the weather data for CDA and HTTC for use with ARMS.
 It'll send you updates automatically every weekday at 09:50, 11:50, 13:50, and 15:50 Singapore time every weekday.
 
 Just type /start to begin.
+
+Set your rota using /setrota command to receive the alerts on your rota days. (e.g. /setrota 1)
+
 If you want to stop receiving updates, type /stop.
     `);
 });
@@ -199,61 +272,72 @@ bot.command('weather', async (ctx) => {
 bot.command('stop', async (ctx) => {
   const chatId = ctx.chat.id;
 
-  const [loadingMessage, isChatSubscribed] = await Promise.all([
-    await ctx.reply('⏳ Loading...'),
-    await redis.sismember('subscribed_chat_ids', ctx.chat.id),
-  ]);
+  // const [loadingMessage, isChatSubscribed] = await Promise.all([
+  //   await ctx.reply('⏳ Loading...'),
+  //
+  //   // Check if the chat is subscribed in any of the sets
+  //   await redis.sismember('subscribed_chat_ids', ctx.chat.id),
+  //   await redis.sismember('subscribed_chat_ids_rota_1', ctx.chat.id),
+  //   await redis.sismember('subscribed_chat_ids_rota_2', ctx.chat.id),
+  //   await redis.sismember('subscribed_chat_ids_rota_3', ctx.chat.id),
+  // ]);
+  //
+  // if (!isChatSubscribed) {
+  //   await ctx.telegram.editMessageText(
+  //     ctx.chat.id,
+  //     loadingMessage.message_id,
+  //     undefined,
+  //     'You are not subscribed to weather updates. Use /start to subscribe.',
+  //   );
+  //   logger.info(
+  //     `Stop command called by Chat ID: ${chatId}. No action taken as the chat is not subscribed.`,
+  //   );
+  //   logger.info(
+  //     `No. of Subscribed Chat IDs: ${await redis.scard('subscribed_chat_ids')}`,
+  //   );
+  //   return;
+  // }
 
-  if (!isChatSubscribed) {
-    await ctx.telegram.editMessageText(
-      ctx.chat.id,
-      loadingMessage.message_id,
-      undefined,
-      'You are not subscribed to weather updates. Use /start to subscribe.',
-    );
-    logger.info(
-      `Stop command called by Chat ID: ${chatId}. No action taken as the chat is not subscribed.`,
-    );
-    logger.info(
-      `No. of Subscribed Chat IDs: ${await redis.scard('subscribed_chat_ids')}`,
-    );
-    return;
-  }
-
+  // Remove from all rotas
   await redis.srem('subscribed_chat_ids', chatId);
-  await ctx.telegram.editMessageText(
-    ctx.chat.id,
-    loadingMessage.message_id,
-    undefined,
-    'You have been unsubscribed from weather updates. Use /start to subscribe to the updates again.',
+  await redis.srem('subscribed_chat_ids_rota_1', chatId);
+  await redis.srem('subscribed_chat_ids_rota_2', chatId);
+  await redis.srem('subscribed_chat_ids_rota_3', chatId);
+
+  // await ctx.telegram.editMessageText(
+  //   ctx.chat.id,
+  //   loadingMessage.message_id,
+  //   undefined,
+  //   'You have been unsubscribed from weather updates. Use /start to subscribe to the updates again.',
+  // );
+
+  await ctx.reply(
+    `You have been unsubscribed from weather updates. Use /start to subscribe to the updates again.`,
   );
 
   logger.info(`Stop command called by Chat ID: ${chatId}.`);
-  logger.info(
-    `No. of Subscribed Chat IDs: ${await redis.scard('subscribed_chat_ids')}`,
-  );
 });
 
-bot.command('logs', async (ctx) => {
-  logger.info('Logs command called by user: ' + ctx.from.username);
-  try {
-    // Read logs from the logs/app.log file
-    const logs = await readFile('logs/app.log', 'utf8');
-    logs.split('\n').slice(-12).join('\n');
-    await ctx.reply(
-      'Here are the last 10 lines of the logs:\n' +
-        logs.split('\n').slice(-10).join('\n'),
-    );
-    logger.info(
-      'Sent logs to user: ' +
-        ctx.from.username +
-        ' (ID: ' +
-        ctx.from.id +
-        ') in chat ID: ' +
-        ctx.chat.id,
-    );
-  } catch (error) {
-    logger.error('Error reading logs:', error);
-    await ctx.reply('Failed to read logs. Please try again later.');
-  }
-});
+// bot.command('logs', async (ctx) => {
+//   logger.info('Logs command called by user: ' + ctx.from.username);
+//   try {
+//     // Read logs from the logs/app.log file
+//     const logs = await readFile('logs/app.log', 'utf8');
+//     logs.split('\n').slice(-12).join('\n');
+//     await ctx.reply(
+//       'Here are the last 10 lines of the logs:\n' +
+//         logs.split('\n').slice(-10).join('\n'),
+//     );
+//     logger.info(
+//       'Sent logs to user: ' +
+//         ctx.from.username +
+//         ' (ID: ' +
+//         ctx.from.id +
+//         ') in chat ID: ' +
+//         ctx.chat.id,
+//     );
+//   } catch (error) {
+//     logger.error('Error reading logs:', error);
+//     await ctx.reply('Failed to read logs. Please try again later.');
+//   }
+// });

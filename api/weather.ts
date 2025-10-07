@@ -2,6 +2,7 @@ import axios from 'axios';
 import haversine from 'haversine-distance';
 import logger from '../utils/logger';
 
+// API Response
 interface AirTempAPIResponse {
   readingType: string;
   readingUnit: string;
@@ -23,6 +24,7 @@ interface AirTempAPIResponse {
   }>;
 }
 
+// API Response
 interface WBGTAPIResponse {
   records: Array<{
     datetime: string;
@@ -49,6 +51,7 @@ interface WBGTAPIResponse {
   paginationToken: string;
 }
 
+// Function response
 interface WBGTResponse {
   wbgt: string;
   heatStress: string;
@@ -64,6 +67,7 @@ interface WBGTResponse {
   dateTime: string;
 }
 
+// Function response
 interface AirTempResponse {
   value: number;
   station: {
@@ -82,6 +86,7 @@ interface AirTempResponse {
   dateTime: string;
 }
 
+// Base response from the API
 interface BaseResponse<T> {
   code: number;
   errorMsg: string;
@@ -91,31 +96,31 @@ interface BaseResponse<T> {
 /**
  * Read datetime for the latest WBGT data
  */
-function getWBGT() {
-  return axios
-    .get<BaseResponse<WBGTAPIResponse>>(
+async function getWBGT() {
+  try {
+    const response = await axios.get<BaseResponse<WBGTAPIResponse>>(
       'https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt',
-    )
-    .then((response) => response.data)
-    .catch((error) => {
-      logger.error('Error fetching WBGT data:', error);
-      throw error;
-    });
+    );
+    return response.data;
+  } catch (error) {
+    logger.error('Error fetching WBGT data:', error);
+    throw error;
+  }
 }
 
 /**
  * Read datetime for the latest Air Temperature data
  */
-function getAirTemp() {
-  return axios
-    .get<BaseResponse<AirTempAPIResponse>>(
+async function getAirTemp() {
+  try {
+    const response = await axios.get<BaseResponse<AirTempAPIResponse>>(
       'https://api-open.data.gov.sg/v2/real-time/api/air-temperature',
-    )
-    .then((response) => response.data)
-    .catch((error) => {
-      logger.error('Error fetching Air Temperature data:', error);
-      throw error;
-    });
+    );
+    return response.data;
+  } catch (error) {
+    logger.error('Error fetching Air Temperature data:', error);
+    throw error;
+  }
 }
 
 /**
