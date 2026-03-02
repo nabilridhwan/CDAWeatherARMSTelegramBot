@@ -6,7 +6,7 @@
   "scripts": {
     "start": "tsc && node dist/index.js",
     "build": "tsc",
-    "test": "echo \"No tests specified\" && exit 0"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
@@ -14,7 +14,8 @@
     "@types/node-schedule": "^2.1.7",
     "prettier": "3.6.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "dotenv": "^17.0.1",
