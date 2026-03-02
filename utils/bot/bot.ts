@@ -1,11 +1,11 @@
 import schedule from 'node-schedule';
 import { Telegraf } from 'telegraf';
-import { getAirTempFromLatLng, getWGBTFromLatLng } from '../api/weather';
-import getRotaNumberForDate from './getRotaNumber';
-import getWBGTEmoji from './getWBGTEmoji';
-import { CDA, HTTC } from './locations';
-import logger from './logger';
-import redis from './redis';
+import { getAirTempFromLatLng, getWGBTFromLatLng } from '../../api/weather';
+import logger from '../infra/logger';
+import redis from '../infra/redis';
+import getRotaNumberForDate from '../schedule/getRotaNumber';
+import getWBGTEmoji from '../weather/getWBGTEmoji';
+import { CDA, HTTC } from '../weather/locations';
 import {
   buildAlreadySubscribedMessage,
   buildRotaSetSuccessMessage,

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import getRotaNumberForDate from './getRotaNumber';
+import getRotaNumberForDate from '../../utils/schedule/getRotaNumber';
 
 describe('getRotaNumberForDate', () => {
   afterEach(() => {

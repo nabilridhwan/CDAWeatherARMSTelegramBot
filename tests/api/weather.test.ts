@@ -7,7 +7,7 @@ vi.mock('axios', () => ({
   },
 }));
 
-vi.mock('../utils/logger', () => ({
+vi.mock('../../utils/infra/logger', () => ({
   default: {
     error: vi.fn(),
     info: vi.fn(),
@@ -70,7 +70,7 @@ describe('weather api', () => {
 
     mockedAxiosGet.mockResolvedValueOnce({ data: wbgtApiResponse });
 
-    const { getWGBTFromLatLng } = await import('./weather');
+    const { getWGBTFromLatLng } = await import('../../api/weather');
     const reading = await getWGBTFromLatLng(1.3001, 103.7601);
 
     expect(mockedAxiosGet).toHaveBeenCalledWith(
@@ -109,7 +109,7 @@ describe('weather api', () => {
 
     mockedAxiosGet.mockResolvedValueOnce({ data: wbgtApiResponse });
 
-    const { getWGBTFromLatLng } = await import('./weather');
+    const { getWGBTFromLatLng } = await import('../../api/weather');
     const reading = await getWGBTFromLatLng(1.3, 103.8);
 
     expect(reading).toEqual({
@@ -175,7 +175,7 @@ describe('weather api', () => {
 
     mockedAxiosGet.mockResolvedValueOnce({ data: airTempApiResponse });
 
-    const { getAirTempFromLatLng } = await import('./weather');
+    const { getAirTempFromLatLng } = await import('../../api/weather');
     const reading = await getAirTempFromLatLng(1.3001, 103.7601);
 
     expect(mockedAxiosGet).toHaveBeenCalledWith(
@@ -239,7 +239,7 @@ describe('weather api', () => {
 
     mockedAxiosGet.mockResolvedValueOnce({ data: airTempApiResponse });
 
-    const { getAirTempFromLatLng } = await import('./weather');
+    const { getAirTempFromLatLng } = await import('../../api/weather');
     const reading = await getAirTempFromLatLng(1.3, 103.76);
 
     expect(reading.value).toBe(-1);

@@ -1,7 +1,19 @@
 import axios from 'axios';
 import { configDotenv } from 'dotenv';
 import haversine from 'haversine-distance';
-import logger from '../utils/logger';
+import logger from '../utils/infra/logger';
+import type {
+  AirTempAPIResponse,
+  AirTempResponse,
+  AirTempStation,
+  BaseResponse,
+  Coordinate,
+  WBGTAPIResponse,
+  WBGTResponse,
+  WbgtReading,
+  WbgtRecord,
+  WbgtStation,
+} from './types/weather';
 
 configDotenv();
 
@@ -16,107 +28,6 @@ const dataGovRequestConfig = {
     'x-api-key': DATA_GOV_API_KEY,
   },
 };
-
-type Coordinate = {
-  latitude: number;
-  longitude: number;
-};
-
-// API Response
-interface AirTempAPIResponse {
-  readingType: string;
-  readingUnit: string;
-  readings: Array<{
-    timestamp: string;
-    data: Array<{
-      stationId: string;
-      value: number;
-    }>;
-  }>;
-  stations: Array<{
-    deviceId: string;
-    id: string;
-    location: {
-      latitude: number;
-      longitude: number;
-    };
-    name: string;
-  }>;
-}
-
-// API Response
-interface WBGTAPIResponse {
-  records: Array<{
-    datetime: string;
-    item: {
-      isStationData: boolean;
-      type: string;
-      readings: Array<{
-        heatStress: string;
-        location: {
-          latitude: string;
-          longitude: string;
-        };
-        wbgt: string;
-        station: {
-          id: string;
-          name: string;
-          area: string;
-          townCenter: string;
-        };
-      }>;
-    };
-    updatedTimestamp: string;
-  }>;
-  paginationToken: string;
-}
-
-// Function response
-interface WBGTResponse {
-  wbgt: string;
-  heatStress: string;
-  station: {
-    id: string;
-    name: string;
-    townCenter: string;
-  };
-  location: {
-    latitude: number;
-    longitude: number;
-  };
-  dateTime: string;
-}
-
-// Function response
-interface AirTempResponse {
-  value: number;
-  station: {
-    deviceId: string;
-    id: string;
-    name: string;
-    location: {
-      latitude: number;
-      longitude: number;
-    };
-  };
-  location: {
-    latitude: number;
-    longitude: number;
-  };
-  dateTime: string;
-}
-
-// Base response from the API
-interface BaseResponse<T> {
-  code: number;
-  errorMsg: string;
-  data: T;
-}
-
-type WbgtRecord = WBGTAPIResponse['records'][number];
-type WbgtReading = WbgtRecord['item']['readings'][number];
-type WbgtStation = WbgtReading['station'];
-type AirTempStation = AirTempAPIResponse['stations'][number];
 
 function distanceBetween(from: Coordinate, to: Coordinate) {
   return haversine(from, to);

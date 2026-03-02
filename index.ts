@@ -1,11 +1,13 @@
-import 'dotenv/config';
-import logger from './utils/logger';
-import redis from './utils/redis';
-import { readFile } from 'node:fs/promises';
+import { configDotenv } from 'dotenv';
 import express, { type Request, type Response } from 'express';
-import { bot, job } from './utils/bot';
 import helmet from 'helmet';
-import './utils/generateSecretToken';
+import { readFile } from 'node:fs/promises';
+import { bot, job } from './utils/bot/bot';
+import './utils/security/generateSecretToken';
+import logger from './utils/infra/logger';
+import redis from './utils/infra/redis';
+
+configDotenv();
 
 const app = express();
 

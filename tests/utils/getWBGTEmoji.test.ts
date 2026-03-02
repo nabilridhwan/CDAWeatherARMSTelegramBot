@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import getWBGTEmoji from './getWBGTEmoji';
+import getWBGTEmoji from '../../utils/weather/getWBGTEmoji';
 
 describe('getWBGTEmoji', () => {
   it('returns green for low heat stress', () => {

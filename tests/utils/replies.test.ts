@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildWeatherReply, escapeMarkdownV2 } from './replies';
+import { buildWeatherReply, escapeMarkdownV2 } from '../../utils/bot/replies';
 
 describe('replies', () => {
   it('builds weather reply with both sites and latest update time', () => {
