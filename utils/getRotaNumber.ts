@@ -1,4 +1,4 @@
-const getRotaNumber = (inputDate: Date = new Date()): 1 | 2 | 3 => {
+const getRotaNumberForDate = (inputDate: Date = new Date()): 1 | 2 | 3 => {
   // Reference date for Rota 3
   const referenceDate = new Date('2025-10-06T00:00:00+08:00');
 
@@ -17,4 +17,4 @@ const getRotaNumber = (inputDate: Date = new Date()): 1 | 2 | 3 => {
   return rotaCycle[idx];
 };
 
-export default getRotaNumber;
+export default getRotaNumberForDate;

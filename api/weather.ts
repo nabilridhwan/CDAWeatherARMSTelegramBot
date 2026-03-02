@@ -1,6 +1,26 @@
 import axios from 'axios';
+import { configDotenv } from 'dotenv';
 import haversine from 'haversine-distance';
 import logger from '../utils/logger';
+
+configDotenv();
+
+const WBGT_API_URL =
+  'https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt';
+const AIR_TEMP_API_URL =
+  'https://api-open.data.gov.sg/v2/real-time/api/air-temperature';
+const DATA_GOV_API_KEY = process.env.DATA_GOV_API_KEY!;
+
+const dataGovRequestConfig = {
+  headers: {
+    'x-api-key': DATA_GOV_API_KEY,
+  },
+};
+
+type Coordinate = {
+  latitude: number;
+  longitude: number;
+};
 
 // API Response
 interface AirTempAPIResponse {
@@ -93,13 +113,99 @@ interface BaseResponse<T> {
   data: T;
 }
 
+type WbgtRecord = WBGTAPIResponse['records'][number];
+type WbgtReading = WbgtRecord['item']['readings'][number];
+type WbgtStation = WbgtReading['station'];
+type AirTempStation = AirTempAPIResponse['stations'][number];
+
+function distanceBetween(from: Coordinate, to: Coordinate) {
+  return haversine(from, to);
+}
+
+function parseWbgtLocation(location: WbgtReading['location']): Coordinate {
+  return {
+    latitude: parseFloat(location.latitude),
+    longitude: parseFloat(location.longitude),
+  };
+}
+
+function defaultWbgtResponse(): WBGTResponse {
+  return {
+    wbgt: '',
+    heatStress: '',
+    station: {
+      id: '',
+      name: '',
+      townCenter: '',
+    },
+    location: {
+      latitude: -1,
+      longitude: -1,
+    },
+    dateTime: '',
+  };
+}
+
+function defaultAirTempStation(): AirTempStation {
+  return {
+    deviceId: '',
+    id: '',
+    name: '',
+    location: {
+      latitude: -1,
+      longitude: -1,
+    },
+  };
+}
+
+function findClosestWbgtStation(
+  records: WbgtRecord[],
+  targetLocation: Coordinate,
+): WbgtStation | null {
+  let closestStation: WbgtStation | null = null;
+  let shortestDistance = Number.MAX_SAFE_INTEGER;
+
+  for (const record of records) {
+    for (const reading of record.item.readings) {
+      const readingLocation = parseWbgtLocation(reading.location);
+      const distance = distanceBetween(targetLocation, readingLocation);
+
+      if (distance < shortestDistance) {
+        shortestDistance = distance;
+        closestStation = reading.station;
+      }
+    }
+  }
+
+  return closestStation;
+}
+
+function findClosestAirTempStation(
+  stations: AirTempStation[],
+  targetLocation: Coordinate,
+): AirTempStation {
+  let closestStation = defaultAirTempStation();
+  let shortestDistance = Number.MAX_SAFE_INTEGER;
+
+  for (const station of stations) {
+    const distance = distanceBetween(targetLocation, station.location);
+    if (distance < shortestDistance) {
+      shortestDistance = distance;
+      closestStation = station;
+    }
+  }
+
+  return closestStation;
+}
+
 /**
  * Read datetime for the latest WBGT data
  */
 async function getWBGT() {
   try {
     const response = await axios.get<BaseResponse<WBGTAPIResponse>>(
-      'https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt',
+      WBGT_API_URL,
+      dataGovRequestConfig,
     );
     return response.data;
   } catch (error) {
@@ -114,7 +220,8 @@ async function getWBGT() {
 async function getAirTemp() {
   try {
     const response = await axios.get<BaseResponse<AirTempAPIResponse>>(
-      'https://api-open.data.gov.sg/v2/real-time/api/air-temperature',
+      AIR_TEMP_API_URL,
+      dataGovRequestConfig,
     );
     return response.data;
   } catch (error) {
@@ -132,76 +239,42 @@ export async function getWGBTFromLatLng(
   lat: number,
   lng: number,
 ): Promise<WBGTResponse> {
-  let wbgtApiRes = await getWBGT();
-  let distToClosestStn = Number.MAX_SAFE_INTEGER;
-  let closestStn: {
-    id: string;
-    name: string;
-    townCenter: string;
-  } = {
-    id: '',
-    name: '',
-    townCenter: '',
+  const targetLocation: Coordinate = {
+    latitude: lat,
+    longitude: lng,
   };
+  const wbgtApiRes = await getWBGT();
 
-  let fnRes: WBGTResponse = {
-    wbgt: '',
-    heatStress: '',
-    station: {
-      id: '',
-      name: '',
-      townCenter: '',
-    },
-    location: {
-      latitude: -1,
-      longitude: -1,
-    },
-    dateTime: '',
-  };
+  const closestStation = findClosestWbgtStation(
+    wbgtApiRes.data.records,
+    targetLocation,
+  );
 
-  // Find the closest station to the given latitude and longitude
-  wbgtApiRes.data.records.forEach((record) => {
-    record.item.readings.forEach((r) => {
-      const loc = {
-        latitude: parseFloat(r.location.latitude),
-        longitude: parseFloat(r.location.longitude),
-      };
+  if (!closestStation) {
+    return defaultWbgtResponse();
+  }
 
-      // calculate distance from the location to the station
-      const distFromLocation = haversine(
-        {
-          latitude: lat,
-          longitude: lng,
-        },
-        loc,
-      );
+  for (const record of wbgtApiRes.data.records) {
+    for (const reading of record.item.readings) {
+      if (reading.station.id === closestStation.id) {
+        const readingLocation = parseWbgtLocation(reading.location);
 
-      if (Math.min(distToClosestStn, distFromLocation) === distFromLocation) {
-        distToClosestStn = distFromLocation;
-        closestStn = r.station;
-      }
-    });
-  });
-
-  // Get the WBGT and heat stress readings from the closest station
-  wbgtApiRes.data.records.forEach((r) => {
-    r.item.readings.forEach((read) => {
-      if (read.station.id == closestStn.id) {
-        fnRes.wbgt = read.wbgt;
-        fnRes.heatStress = read.heatStress;
-        fnRes.station = read.station;
-        fnRes.dateTime = r.datetime;
-        fnRes.location = {
-          latitude: parseFloat(read.location.latitude),
-          longitude: parseFloat(read.location.longitude),
+        return {
+          wbgt: reading.wbgt,
+          heatStress: reading.heatStress,
+          station: {
+            id: reading.station.id,
+            name: reading.station.name,
+            townCenter: reading.station.townCenter,
+          },
+          location: readingLocation,
+          dateTime: record.datetime,
         };
       }
-    });
-  });
+    }
+  }
 
-  // console.log(fnRes)
-
-  return fnRes;
+  return defaultWbgtResponse();
 }
 
 /**
@@ -213,77 +286,34 @@ export async function getAirTempFromLatLng(
   lat: number,
   lng: number,
 ): Promise<AirTempResponse> {
-  let airTempApiRes = await getAirTemp();
-  let distToClosestStn = Number.MAX_SAFE_INTEGER;
-  let closestStn: {
-    deviceId: string;
-    id: string;
-    name: string;
-    location: {
-      latitude: number;
-      longitude: number;
-    };
-  } = {
-    deviceId: '',
-    id: '',
-    name: '',
-    location: {
-      latitude: -1,
-      longitude: -1,
-    },
+  const targetLocation: Coordinate = {
+    latitude: lat,
+    longitude: lng,
   };
+  const airTempApiRes = await getAirTemp();
 
-  // Find the closest station to the given latitude and longitude
-  airTempApiRes.data.stations.forEach((station) => {
-    const loc = {
-      latitude: station.location.latitude,
-      longitude: station.location.longitude,
-    };
+  const closestStation = findClosestAirTempStation(
+    airTempApiRes.data.stations,
+    targetLocation,
+  );
 
-    // calculate distance from the location to the station
-    const distFromLocation = haversine(
-      {
-        latitude: lat,
-        longitude: lng,
-      },
-      loc,
-    );
+  const latestReading = airTempApiRes.data.readings[0];
+  const stationReading = latestReading?.data.find(
+    (reading) => reading.stationId === closestStation.id,
+  );
 
-    if (Math.min(distToClosestStn, distFromLocation) === distFromLocation) {
-      distToClosestStn = distFromLocation;
-      closestStn = station;
-    }
-  });
-
-  // Get the air temperature readings from the closest station
-  let fnRes: AirTempResponse = {
-    dateTime: '',
-    value: -1,
+  return {
+    dateTime: latestReading?.timestamp ?? '',
+    value: stationReading?.value ?? -1,
     station: {
-      deviceId: closestStn.deviceId,
-      id: closestStn.id,
-      name: closestStn.name,
+      deviceId: closestStation.deviceId,
+      id: closestStation.id,
+      name: closestStation.name,
       location: {
-        latitude: closestStn.location.latitude,
-        longitude: closestStn.location.longitude,
+        latitude: closestStation.location.latitude,
+        longitude: closestStation.location.longitude,
       },
     },
-    location: {
-      latitude: lat,
-      longitude: lng,
-    },
+    location: targetLocation,
   };
-
-  const { data, timestamp } = airTempApiRes.data.readings[0];
-  fnRes.dateTime = timestamp;
-
-  data.forEach((reading) => {
-    if (reading.stationId === closestStn.id) {
-      fnRes.value = reading.value;
-    }
-  });
-
-  // console.log(fnRes)
-
-  return fnRes;
 }
