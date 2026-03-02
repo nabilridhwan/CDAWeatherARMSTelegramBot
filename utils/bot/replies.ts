@@ -95,8 +95,67 @@ Set your rota using /setrota command to receive the alerts on your rota days. (e
 If you want to stop receiving updates, type /stop.
     `;
 
-export const WEATHER_FETCH_FAILED_MESSAGE =
-  'Failed to fetch weather data. Try /weather command to get the latest data.';
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function getStatusCode(error: unknown): string {
+  if (!isObject(error)) {
+    return 'UNKNOWN';
+  }
+
+  const status =
+    error.status ??
+    (isObject(error.response) ? error.response.status : undefined);
+
+  if (typeof status === 'number') {
+    return String(status);
+  }
+
+  if (typeof status === 'string' && status.trim().length > 0) {
+    return status;
+  }
+
+  return 'UNKNOWN';
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  if (!isObject(error)) {
+    return 'Unknown error';
+  }
+
+  const responseData = isObject(error.response)
+    ? error.response.data
+    : undefined;
+
+  if (typeof responseData === 'string' && responseData.trim().length > 0) {
+    return responseData;
+  }
+
+  if (isObject(responseData)) {
+    const messageFromData = responseData.message ?? responseData.error;
+    if (
+      typeof messageFromData === 'string' &&
+      messageFromData.trim().length > 0
+    ) {
+      return messageFromData;
+    }
+  }
+
+  if (typeof error.message === 'string' && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return 'Unknown error';
+}
+
+export function buildWeatherFetchFailedMessage(error: unknown): string {
+  return `Failed to fetch weather data.\nStatus code: ${getStatusCode(error)}\nError: ${getErrorMessage(error)}\n\nPlease retry with /weather`;
+}
 
 export const STOP_SUCCESS_MESSAGE =
   'You have been unsubscribed from weather updates. Use /start to subscribe to the updates again.';

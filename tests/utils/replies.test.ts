@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildWeatherReply, escapeMarkdownV2 } from '../../utils/bot/replies';
+import {
+  buildWeatherFetchFailedMessage,
+  buildWeatherReply,
+  escapeMarkdownV2,
+} from '../../utils/bot/replies';
 
 describe('replies', () => {
   it('builds weather reply with both sites and latest update time', () => {
@@ -56,5 +60,32 @@ describe('replies', () => {
   it('escapes markdown v2 special characters used by the bot', () => {
     const escaped = escapeMarkdownV2('A.test (value)');
     expect(escaped).toBe('A\\.test \\(value\\)');
+  });
+
+  it('builds weather fetch error message with status code and message from axios-like error', () => {
+    const message = buildWeatherFetchFailedMessage({
+      response: {
+        status: 503,
+        data: {
+          message: 'Service unavailable',
+        },
+      },
+    });
+
+    expect(message).toContain('Status code: 503');
+    expect(message).toContain('Error: Service unavailable');
+    expect(message).toContain('Please retry with /weather');
+  });
+
+  it('builds weather fetch error message for runtime errors without status code', () => {
+    const message = buildWeatherFetchFailedMessage(
+      new SyntaxError('Unexpected token } in JSON at position 4'),
+    );
+
+    expect(message).toContain('Status code: UNKNOWN');
+    expect(message).toContain(
+      'Error: Unexpected token } in JSON at position 4',
+    );
+    expect(message).toContain('Please retry with /weather');
   });
 });

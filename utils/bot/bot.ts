@@ -9,6 +9,7 @@ import { CDA, HTTC } from '../weather/locations';
 import {
   buildAlreadySubscribedMessage,
   buildRotaSetSuccessMessage,
+  buildWeatherFetchFailedMessage,
   buildWeatherReply,
   escapeMarkdownV2,
   HELP_MESSAGE,
@@ -17,7 +18,6 @@ import {
   LOADING_MESSAGE,
   SETROTA_ERROR_MESSAGE,
   STOP_SUCCESS_MESSAGE,
-  WEATHER_FETCH_FAILED_MESSAGE,
   WELCOME_SUBSCRIBED_MESSAGE,
 } from './replies';
 
@@ -162,10 +162,10 @@ export const job = schedule.scheduleJob(rule, async (fireDate) => {
           .sendMessage(chatId, escapedReply, {
             parse_mode: 'MarkdownV2',
           })
-          .catch(() => {
+          .catch((error) => {
             return bot.telegram.sendMessage(
               chatId,
-              WEATHER_FETCH_FAILED_MESSAGE,
+              buildWeatherFetchFailedMessage(error),
             );
           }),
       ),
@@ -308,7 +308,7 @@ bot.command('weather', async (ctx) => {
       ctx.chat.id,
       loadingMessage.message_id,
       undefined,
-      WEATHER_FETCH_FAILED_MESSAGE,
+      buildWeatherFetchFailedMessage(error),
     );
   }
 });
