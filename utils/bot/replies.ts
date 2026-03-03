@@ -60,13 +60,17 @@ Next update: ${formatSingaporeDate(nextUpdate)}`;
 
 export const WELCOME_SUBSCRIBED_MESSAGE = `Welcome 👋🏻
   
-Select your rota to receive weather updates for CDA and HTTC tailored to your working days.
-
-If you want to receive updates every weekday, please select "Office Hours".
+Select your rota below to receive weather updates for CDA and HTTC tailored to your working days. If you want to receive updates every weekday, please select "Office Hours".
 
 Weather reports will be sent automatically every weekday at 09:50, 11:50, 13:50, and 15:50 Singapore time.
 
 You can also use the /weather command to get the current snapshot of the weather data.
+
+Reply with /stop to unsubscribe from the weather updates.`;
+
+export const CHANGE_ROTA_MESSAGE = `Select your rota below to receive weather updates for CDA and HTTC tailored to your working days. If you want to receive updates every weekday, please select "Office Hours".
+
+Weather reports will be sent automatically every weekday at 09:50, 11:50, 13:50, and 15:50 Singapore time.
 
 Reply with /stop to unsubscribe from the weather updates.`;
 

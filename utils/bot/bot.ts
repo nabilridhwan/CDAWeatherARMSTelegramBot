@@ -12,10 +12,10 @@ import {
   buildRotaSetSuccessMessage,
   buildWeatherFetchFailedMessage,
   buildWeatherReply,
+  CHANGE_ROTA_MESSAGE,
   escapeMarkdownV2,
   HELP_MESSAGE,
   LOADING_MESSAGE,
-  SETROTA_ERROR_MESSAGE,
   STOP_SUCCESS_MESSAGE,
   WELCOME_SUBSCRIBED_MESSAGE,
 } from './replies';
@@ -232,9 +232,9 @@ bot.start(async (ctx) => {
     ctx.chat.id,
     WELCOME_SUBSCRIBED_MESSAGE,
     Markup.inlineKeyboard([
-      Markup.button.callback('Set Rota 1', 'set_rota_1'),
-      Markup.button.callback('Set Rota 2', 'set_rota_2'),
-      Markup.button.callback('Set Rota 3', 'set_rota_3'),
+      Markup.button.callback('Rota 1', 'set_rota_1'),
+      Markup.button.callback('Rota 2', 'set_rota_2'),
+      Markup.button.callback('Rota 3', 'set_rota_3'),
       Markup.button.callback('Office Hours', 'set_office_hours'),
     ]),
   );
@@ -263,19 +263,28 @@ bot.action('set_rota_3', async (ctx) => {
 });
 
 bot.action('set_office_hours', async (ctx) => {
-  assignRota('office_hours', ctx);
+  await assignRota('office_hours', ctx);
   ctx.editMessageText(buildRotaSetSuccessMessage('office_hours'));
   ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
 });
 
-async function assignRota(rotaNumber: RotaNumber | 'office_hours', ctx: any) {
+bot.action('stop_updates', async (ctx) => {
+  await stopUpdates(ctx);
+  ctx.editMessageText(STOP_SUCCESS_MESSAGE);
+  ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
+});
+
+async function stopUpdates(ctx: any) {
   try {
     await removeChatFromAllSubscriptions(ctx.chat.id);
   } catch (err) {
     logger.error(`Failed to remove chat ID from other rota sets: ${err}`);
-    ctx.reply(SETROTA_ERROR_MESSAGE);
     return;
   }
+}
+
+async function assignRota(rotaNumber: RotaNumber | 'office_hours', ctx: any) {
+  await stopUpdates(ctx);
 
   if (rotaNumber === 'office_hours') {
     await redis.sadd(SUBSCRIBED_CHAT_IDS_KEY, ctx.chat.id);
@@ -344,7 +353,20 @@ bot.command('stop', async (ctx) => {
 });
 
 bot.command('settings', (ctx) => {
-  ctx.reply(buildSettingsMessage());
+  ctx.telegram.sendMessage(
+    ctx.chat.id,
+    CHANGE_ROTA_MESSAGE + '\n\n' + buildSettingsMessage(),
+    Markup.inlineKeyboard(
+      [
+        Markup.button.callback('Rota 1', 'set_rota_1'),
+        Markup.button.callback('Rota 2', 'set_rota_2'),
+        Markup.button.callback('Rota 3', 'set_rota_3'),
+        Markup.button.callback('Office Hours', 'set_office_hours'),
+        Markup.button.callback('Stop Updates', 'stop_updates'),
+      ],
+      { columns: 1 },
+    ),
+  );
 });
 
 bot.help((ctx) => {
