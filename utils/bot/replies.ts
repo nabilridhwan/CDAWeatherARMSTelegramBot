@@ -92,6 +92,8 @@ It'll send you updates automatically every weekday at 09:50, 11:50, 13:50, and 1
 
 Just type /start to begin.
 
+Use /settings to check your bot version.
+
 If you want to stop receiving updates, type /stop.
 `;
 

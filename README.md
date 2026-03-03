@@ -42,6 +42,9 @@ Heat stress is converted to status emojis:
 - `/weather`  
    Sends immediate weather snapshot for CDA + HTTC.
 
+- `/settings`  
+   Shows current bot version (supports commit hash and custom version override).
+
 - `/stop`  
    Unsubscribes chat from all subscription sets.
 
@@ -145,6 +148,9 @@ Create a `.env` file in project root:
 ```bash
 # Telegram
 BOT_ID=<telegram_bot_token>
+
+# Optional: override version shown by /settings
+BOT_VERSION=<custom_version_label>
 
 # App URL used for webhook registration
 HOST=https://your-domain.example.com

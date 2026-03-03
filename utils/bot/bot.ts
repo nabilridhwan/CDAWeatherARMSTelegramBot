@@ -3,6 +3,7 @@ import { Markup, Telegraf } from 'telegraf';
 import { getAirTempFromLatLng, getWGBTFromLatLng } from '../../api/weather';
 import logger from '../infra/logger';
 import redis from '../infra/redis';
+import { buildSettingsMessage } from '../infra/version';
 import getRotaNumberForDate from '../schedule/getRotaNumber';
 import getWBGTEmoji from '../weather/getWBGTEmoji';
 import { CDA, HTTC } from '../weather/locations';
@@ -340,6 +341,10 @@ bot.command('stop', async (ctx) => {
   await ctx.reply(STOP_SUCCESS_MESSAGE);
 
   logger.info(`Stop command called by Chat ID: ${chatId}.`);
+});
+
+bot.command('settings', (ctx) => {
+  ctx.reply(buildSettingsMessage());
 });
 
 bot.help((ctx) => {
