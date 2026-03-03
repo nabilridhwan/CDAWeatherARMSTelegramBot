@@ -47,13 +47,11 @@ export function buildAlreadySubscribedMessage(params: {
     nextUpdate,
   } = params;
 
-  return `Welcome back 👋🏻
-        
-You're already subscribed to receive weather updates for CDA and HTTC.
+  return `You're already subscribed to receive weather updates for CDA and HTTC.
 
 You are currently subscribed to: ${isSubscribedToRota1 ? 'Rota 1' : isSubscribedToRota2 ? 'Rota 2' : isSubscribedToRota3 ? 'Rota 3' : 'All Weekdays'} and will receive notifications accordingly.
 
-You may use the /weather command to get the latest weather data on demand.
+You may use the /weather command to get the current snapshot of the weather data.
 
 Reply with /stop to unsubscribe from the weather updates.
 
@@ -62,13 +60,13 @@ Next update: ${formatSingaporeDate(nextUpdate)}`;
 
 export const WELCOME_SUBSCRIBED_MESSAGE = `Welcome 👋🏻
   
-You're now subscribed to receive weather updates for CDA and HTTC.
+Select your rota to receive weather updates for CDA and HTTC tailored to your working days.
+
+If you want to receive updates every weekday, please select "Office Hours".
 
 Weather reports will be sent automatically every weekday at 09:50, 11:50, 13:50, and 15:50 Singapore time.
 
-You can also use the /weather command to get the latest weather data on demand.
-
-You can also set your rota using /setrota command (e.g. /setrota 1) to receive the alerts on your rota working shifts.
+You can also use the /weather command to get the current snapshot of the weather data.
 
 Reply with /stop to unsubscribe from the weather updates.`;
 
@@ -81,19 +79,21 @@ export const INVALID_ROTA_RANGE_MESSAGE =
 export const SETROTA_ERROR_MESSAGE =
   'An error occurred while setting your rota. Please try again later.';
 
-export function buildRotaSetSuccessMessage(rota: number) {
-  return `Your rota has been set to Rota ${rota}. You will receive weather updates on your rota days. If you want to receive updates every weekday, please use /start command to subscribe without setting a rota.`;
+export function buildRotaSetSuccessMessage(rota: number | 'office_hours') {
+  if (rota === 'office_hours') {
+    return `Your rota has been set to Office Hours. You will receive weather updates every weekday. To change your rota or settings. Use the /stop command then /start.`;
+  }
+
+  return `Your rota has been set to Rota ${rota}. You will receive weather updates on your rota working days. To change your rota or settings. Use the /stop command then /start.`;
 }
 
-export const HELP_MESSAGE = `This bot provides you with the weather data for CDA and HTTC for use with ARMS.
+export const HELP_MESSAGE = `This bot provides you with instant weather data for CDA and HTTC.
 It'll send you updates automatically every weekday at 09:50, 11:50, 13:50, and 15:50 Singapore time every weekday.
 
 Just type /start to begin.
 
-Set your rota using /setrota command to receive the alerts on your rota days. (e.g. /setrota 1)
-
 If you want to stop receiving updates, type /stop.
-    `;
+`;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

@@ -194,7 +194,7 @@ bot.start(async (ctx) => {
   );
 
   const [
-    isChatSubscribed,
+    isSubscribedOfficeHours,
     isSubscribedToRota1,
     isSubscribedToRota2,
     isSubscribedToRota3,
@@ -206,7 +206,7 @@ bot.start(async (ctx) => {
   ]);
 
   const hasSubscribedToAnyChat =
-    isChatSubscribed == 1 ||
+    isSubscribedOfficeHours == 1 ||
     isSubscribedToRota1 == 1 ||
     isSubscribedToRota2 == 1 ||
     isSubscribedToRota3 == 1;
@@ -227,8 +227,6 @@ bot.start(async (ctx) => {
     return;
   }
 
-  await redis.sadd(SUBSCRIBED_CHAT_IDS_KEY, ctx.chat.id);
-
   ctx.telegram.sendMessage(
     ctx.chat.id,
     WELCOME_SUBSCRIBED_MESSAGE,
@@ -246,31 +244,27 @@ bot.start(async (ctx) => {
 // handler for set_rota_1, set_rota_2, set_rota_3, and set_office_hours callback buttons
 bot.action('set_rota_1', async (ctx) => {
   await assignRota(1, ctx);
-  ctx.editMessageText(
-    'You have selected Rota 1. You will receive updates on Rota 1 days (Mon Week 1, Tue Week 2, Wed Week 3, Thu Week 1, Fri Week 2).',
-  );
+  ctx.editMessageText(buildRotaSetSuccessMessage(1));
   ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
 });
 
 bot.action('set_rota_2', async (ctx) => {
   // call assignRota
   await assignRota(2, ctx);
-  ctx.editMessageText(
-    'You have selected Rota 2. You will receive updates on Rota 2 days (Mon Week 2, Tue Week 3, Wed Week 1, Thu Week 2, Fri Week 3).',
-  );
+  ctx.editMessageText(buildRotaSetSuccessMessage(2));
   ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
 });
 
 bot.action('set_rota_3', async (ctx) => {
   await assignRota(3, ctx);
-  ctx.editMessageText(
-    'You have selected Rota 3. You will receive updates on Rota 3 days (Mon Week 3, Tue Week 1, Wed Week 2, Thu Week 3, Fri Week 1).',
-  );
+  ctx.editMessageText(buildRotaSetSuccessMessage(3));
   ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
 });
 
 bot.action('set_office_hours', async (ctx) => {
   assignRota('office_hours', ctx);
+  ctx.editMessageText(buildRotaSetSuccessMessage('office_hours'));
+  ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
 });
 
 async function assignRota(rotaNumber: RotaNumber | 'office_hours', ctx: any) {
@@ -295,28 +289,6 @@ async function assignRota(rotaNumber: RotaNumber | 'office_hours', ctx: any) {
   ctx.reply(buildRotaSetSuccessMessage(rotaNumber));
   logger.info(`Set Chat ID: ${ctx.chat.id} to Rota ${rotaNumber}.`);
 }
-
-// bot.command('setrota', async (ctx) => {
-//   const { rota, isInvalidFormat } = parseRotaFromCommand(ctx.message.text);
-//   if (!rota) {
-//     ctx.reply(
-//       isInvalidFormat ? INVALID_ROTA_MESSAGE : INVALID_ROTA_RANGE_MESSAGE,
-//     );
-//     return;
-//   }
-
-//   try {
-//     await removeChatFromAllSubscriptions(ctx.chat.id);
-//   } catch (err) {
-//     logger.error(`Failed to remove chat ID from other rota sets: ${err}`);
-//     ctx.reply(SETROTA_ERROR_MESSAGE);
-//     return;
-//   }
-
-//   await redis.sadd(getRotaSubscriptionKey(rota), ctx.chat.id);
-//   ctx.reply(buildRotaSetSuccessMessage(rota));
-//   logger.info(`Set Chat ID: ${ctx.chat.id} to Rota ${rota}.`);
-// });
 
 bot.command('weather', async (ctx) => {
   logger.info(
