@@ -1,5 +1,5 @@
 import schedule from 'node-schedule';
-import { Telegraf } from 'telegraf';
+import { Markup, Telegraf } from 'telegraf';
 import { getAirTempFromLatLng, getWGBTFromLatLng } from '../../api/weather';
 import logger from '../infra/logger';
 import redis from '../infra/redis';
@@ -13,8 +13,6 @@ import {
   buildWeatherReply,
   escapeMarkdownV2,
   HELP_MESSAGE,
-  INVALID_ROTA_MESSAGE,
-  INVALID_ROTA_RANGE_MESSAGE,
   LOADING_MESSAGE,
   SETROTA_ERROR_MESSAGE,
   STOP_SUCCESS_MESSAGE,
@@ -196,13 +194,11 @@ bot.start(async (ctx) => {
   );
 
   const [
-    loadingMessage,
     isChatSubscribed,
     isSubscribedToRota1,
     isSubscribedToRota2,
     isSubscribedToRota3,
   ] = await Promise.all([
-    ctx.reply(LOADING_MESSAGE),
     redis.sismember(SUBSCRIBED_CHAT_IDS_KEY, ctx.chat.id),
     redis.sismember(getRotaSubscriptionKey(1), ctx.chat.id),
     redis.sismember(getRotaSubscriptionKey(2), ctx.chat.id),
@@ -223,12 +219,7 @@ bot.start(async (ctx) => {
       nextUpdate: new Date(job.nextInvocation()),
     });
 
-    ctx.telegram.editMessageText(
-      ctx.chat.id,
-      loadingMessage.message_id,
-      undefined,
-      msg,
-    );
+    ctx.telegram.sendMessage(ctx.chat.id, msg, undefined);
 
     logger.info(
       'Chat ID: ' + ctx.chat.id + ' is already subscribed. No action taken.',
@@ -238,25 +229,51 @@ bot.start(async (ctx) => {
 
   await redis.sadd(SUBSCRIBED_CHAT_IDS_KEY, ctx.chat.id);
 
-  ctx.telegram.editMessageText(
+  ctx.telegram.sendMessage(
     ctx.chat.id,
-    loadingMessage.message_id,
-    undefined,
     WELCOME_SUBSCRIBED_MESSAGE,
+    Markup.inlineKeyboard([
+      Markup.button.callback('Set Rota 1', 'set_rota_1'),
+      Markup.button.callback('Set Rota 2', 'set_rota_2'),
+      Markup.button.callback('Set Rota 3', 'set_rota_3'),
+      Markup.button.callback('Office Hours', 'set_office_hours'),
+    ]),
   );
 
   logger.info('Added Chat ID: ' + ctx.chat.id + ' to subscribed chat IDs.');
 });
 
-bot.command('setrota', async (ctx) => {
-  const { rota, isInvalidFormat } = parseRotaFromCommand(ctx.message.text);
-  if (!rota) {
-    ctx.reply(
-      isInvalidFormat ? INVALID_ROTA_MESSAGE : INVALID_ROTA_RANGE_MESSAGE,
-    );
-    return;
-  }
+// handler for set_rota_1, set_rota_2, set_rota_3, and set_office_hours callback buttons
+bot.action('set_rota_1', async (ctx) => {
+  await assignRota(1, ctx);
+  ctx.editMessageText(
+    'You have selected Rota 1. You will receive updates on Rota 1 days (Mon Week 1, Tue Week 2, Wed Week 3, Thu Week 1, Fri Week 2).',
+  );
+  ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
+});
 
+bot.action('set_rota_2', async (ctx) => {
+  // call assignRota
+  await assignRota(2, ctx);
+  ctx.editMessageText(
+    'You have selected Rota 2. You will receive updates on Rota 2 days (Mon Week 2, Tue Week 3, Wed Week 1, Thu Week 2, Fri Week 3).',
+  );
+  ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
+});
+
+bot.action('set_rota_3', async (ctx) => {
+  await assignRota(3, ctx);
+  ctx.editMessageText(
+    'You have selected Rota 3. You will receive updates on Rota 3 days (Mon Week 3, Tue Week 1, Wed Week 2, Thu Week 3, Fri Week 1).',
+  );
+  ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
+});
+
+bot.action('set_office_hours', async (ctx) => {
+  assignRota('office_hours', ctx);
+});
+
+async function assignRota(rotaNumber: RotaNumber | 'office_hours', ctx: any) {
   try {
     await removeChatFromAllSubscriptions(ctx.chat.id);
   } catch (err) {
@@ -265,10 +282,41 @@ bot.command('setrota', async (ctx) => {
     return;
   }
 
-  await redis.sadd(getRotaSubscriptionKey(rota), ctx.chat.id);
-  ctx.reply(buildRotaSetSuccessMessage(rota));
-  logger.info(`Set Chat ID: ${ctx.chat.id} to Rota ${rota}.`);
-});
+  if (rotaNumber === 'office_hours') {
+    await redis.sadd(SUBSCRIBED_CHAT_IDS_KEY, ctx.chat.id);
+    ctx.reply(
+      'You have been subscribed to receive updates every weekday during office hours. You will receive updates on all weekdays without rota differentiation.',
+    );
+    logger.info(`Set Chat ID: ${ctx.chat.id} to Office Hours subscription.`);
+    return;
+  }
+
+  await redis.sadd(getRotaSubscriptionKey(rotaNumber), ctx.chat.id);
+  ctx.reply(buildRotaSetSuccessMessage(rotaNumber));
+  logger.info(`Set Chat ID: ${ctx.chat.id} to Rota ${rotaNumber}.`);
+}
+
+// bot.command('setrota', async (ctx) => {
+//   const { rota, isInvalidFormat } = parseRotaFromCommand(ctx.message.text);
+//   if (!rota) {
+//     ctx.reply(
+//       isInvalidFormat ? INVALID_ROTA_MESSAGE : INVALID_ROTA_RANGE_MESSAGE,
+//     );
+//     return;
+//   }
+
+//   try {
+//     await removeChatFromAllSubscriptions(ctx.chat.id);
+//   } catch (err) {
+//     logger.error(`Failed to remove chat ID from other rota sets: ${err}`);
+//     ctx.reply(SETROTA_ERROR_MESSAGE);
+//     return;
+//   }
+
+//   await redis.sadd(getRotaSubscriptionKey(rota), ctx.chat.id);
+//   ctx.reply(buildRotaSetSuccessMessage(rota));
+//   logger.info(`Set Chat ID: ${ctx.chat.id} to Rota ${rota}.`);
+// });
 
 bot.command('weather', async (ctx) => {
   logger.info(
