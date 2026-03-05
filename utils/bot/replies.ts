@@ -31,13 +31,21 @@ export function buildWeatherReply(
     nextUpdate?: Date;
   },
 ) {
-  const baseReply = `*CDA*:\n🌡️ Heat Stress: ${cda.heatStress} ${cda.emoji}\n🌍 WBGT: ${cda.wbgt} °C\n🌬️ Air Temp: ${cda.airTemp} °C\n\n*HTTC*:\n🌡️ Heat Stress: ${httc.heatStress} ${httc.emoji}\n🌍 WBGT: ${httc.wbgt} °C\n🌬️ Air Temp: ${httc.airTemp} °C\n\nLast updated: ${formatSingaporeDate(cda.dateTime)}`;
+  let baseReply = `*CDA*:\n🌡️ Heat Stress: ${cda.heatStress} ${cda.emoji}\n🌍 WBGT: ${cda.wbgt} °C\n🌬️ Air Temp: ${cda.airTemp} °C\n\n*HTTC*:\n🌡️ Heat Stress: ${httc.heatStress} ${httc.emoji}\n🌍 WBGT: ${httc.wbgt} °C\n🌬️ Air Temp: ${httc.airTemp} °C\n\nLast updated: ${formatSingaporeDate(cda.dateTime)}`;
 
-  if (!options?.jobDate || !options?.nextUpdate) {
-    return baseReply;
+  // if (!options?.jobDate || !options?.nextUpdate) {
+  //   return baseReply;
+  // }
+
+  if (options?.jobDate) {
+    baseReply += `\n\nJob date: ${formatSingaporeDate(new Date())}`;
   }
 
-  return `${baseReply}.\nJob date: ${formatSingaporeDate(options.jobDate)}\nNext Update: ${formatSingaporeDate(options.nextUpdate)}`;
+  if (options?.nextUpdate) {
+    baseReply += `\nNext update: ${formatSingaporeDate(options.nextUpdate)}`;
+  }
+
+  return baseReply;
 }
 
 export function buildAlreadySubscribedMessage(

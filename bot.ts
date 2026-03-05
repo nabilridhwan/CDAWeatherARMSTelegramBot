@@ -48,7 +48,6 @@ export const job = schedule.scheduleJob(rule, async (fireDate) => {
     const readings = await fetchWeatherReadings();
     const escapedReply = buildEscapedWeatherReply(readings, {
       jobDate: new Date(fireDate),
-      nextUpdate: new Date(job.nextInvocation()),
     });
 
     const sendingChatPromises = await Promise.allSettled(
