@@ -2,10 +2,10 @@ import { configDotenv } from 'dotenv';
 import express, { type Request, type Response } from 'express';
 import helmet from 'helmet';
 import { readFile } from 'node:fs/promises';
-import { bot, job } from './utils/bot/bot';
-import './utils/security/generateSecretToken';
+import { bot, job } from './bot';
 import logger from './utils/infra/logger';
 import redis from './utils/infra/redis';
+import './utils/security/generateSecretToken';
 
 configDotenv();
 

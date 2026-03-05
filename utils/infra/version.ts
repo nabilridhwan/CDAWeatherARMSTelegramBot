@@ -98,7 +98,7 @@ export function getBotVersionInfo(
   };
 }
 
-export function buildSettingsMessage(): string {
+export function generateVersionInfoMessage(): string {
   const versionInfo = getBotVersionInfo();
 
   return `Current bot version: ${versionInfo.value}\nVersion source: ${versionInfo.source}`;

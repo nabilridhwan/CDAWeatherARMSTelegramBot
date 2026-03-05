@@ -1,3 +1,7 @@
+import { WeatherReadings } from '../weather/fetchWeatherReadings';
+import getWBGTEmoji from '../weather/getWBGTEmoji';
+import { SubscriptionRota } from './subscriptions';
+
 type WeatherSnapshot = {
   heatStress: string;
   wbgt: string;
@@ -34,45 +38,45 @@ export function buildWeatherReply(
   return `${baseReply}.\nJob date: ${formatSingaporeDate(options.jobDate)}\nNext Update: ${formatSingaporeDate(options.nextUpdate)}`;
 }
 
-export function buildAlreadySubscribedMessage(params: {
-  isSubscribedToRota1: number;
-  isSubscribedToRota2: number;
-  isSubscribedToRota3: number;
-  nextUpdate: Date;
-}) {
-  const {
-    isSubscribedToRota1,
-    isSubscribedToRota2,
-    isSubscribedToRota3,
-    nextUpdate,
-  } = params;
+export function buildAlreadySubscribedMessage(
+  rotaNumber: SubscriptionRota,
+  nextUpdate: Date,
+) {
+  const schedule =
+    rotaNumber === 'office_hours' ? 'Office Hours' : `Rota ${rotaNumber}`;
 
-  return `You're already subscribed to receive weather updates for CDA and HTTC.
+  return `👋🏻 You're already subscribed to the CDA ARMS Weather Bot!
 
-You are currently subscribed to: ${isSubscribedToRota1 ? 'Rota 1' : isSubscribedToRota2 ? 'Rota 2' : isSubscribedToRota3 ? 'Rota 3' : 'All Weekdays'} and will receive notifications accordingly.
+You are currently on *${schedule}* and will receive weather updates accordingly.
 
-You may use the /weather command to get the current snapshot of the weather data.
+Next update: ${formatSingaporeDate(nextUpdate)}
 
-Reply with /stop to unsubscribe from the weather updates.
-
-Next update: ${formatSingaporeDate(nextUpdate)}`;
+To change your schedule, use /settings. To unsubscribe, use /stop.`;
 }
 
-export const WELCOME_SUBSCRIBED_MESSAGE = `Welcome 👋🏻
-  
-Select your rota below to receive weather updates for CDA and HTTC tailored to your working days. If you want to receive updates every weekday, please select "Office Hours".
+export const WELCOME_SUBSCRIBED_MESSAGE = `👋🏻 Welcome to the CDA ARMS Weather Bot!
 
-Weather reports will be sent automatically every weekday at 09:50, 11:50, 13:50, and 15:50 Singapore time.
+This bot automatically sends you WBGT and heat stress updates for CDA and HTTC — 10 minutes before each ARMS Weather Report deadline, so you can submit your report without manually checking myENV.
 
-You can also use the /weather command to get the current snapshot of the weather data.
+Reports are sent every weekday at 09:50, 11:50, 13:50, and 15:50 SGT.
 
-Reply with /stop to unsubscribe from the weather updates.`;
+*Getting started:*
+1️⃣ Select your rota below to receive updates on your working days
+2️⃣ Or select "Office Hours" to receive updates every weekday
+3️⃣ Use /weather anytime to get a live snapshot of the current weather data
 
-export const CHANGE_ROTA_MESSAGE = `Select your rota below to receive weather updates for CDA and HTTC tailored to your working days. If you want to receive updates every weekday, please select "Office Hours".
+Use /stop to unsubscribe at any time.`;
 
-Weather reports will be sent automatically every weekday at 09:50, 11:50, 13:50, and 15:50 Singapore time.
+export function buildSettingsMessages(rotaNumber: number | 'office_hours') {
+  const schedule =
+    rotaNumber === 'office_hours' ? 'Office Hours' : `Rota ${rotaNumber}`;
 
-Reply with /stop to unsubscribe from the weather updates.`;
+  return `⚙️ *Settings*
+
+You are currently on *${schedule}* and will receive weather updates accordingly.
+
+To change your schedule, select a different option below. To unsubscribe, use /stop.`;
+}
 
 export const INVALID_ROTA_MESSAGE =
   'Please provide a valid rota number (1, 2, or 3). Example: /setrota 1';
@@ -85,21 +89,17 @@ export const SETROTA_ERROR_MESSAGE =
 
 export function buildRotaSetSuccessMessage(rota: number | 'office_hours') {
   if (rota === 'office_hours') {
-    return `Your rota has been set to Office Hours. You will receive weather updates every weekday. To change your rota or settings. Use the /stop command then /start.`;
+    return `✅ You're subscribed to Office Hours. You will receive weather updates every weekday. To change your schedule, use the /settings command.`;
   }
 
-  return `Your rota has been set to Rota ${rota}. You will receive weather updates on your rota working days. To change your rota or settings. Use the /stop command then /start.`;
+  return `✅ You're subscribed to Rota ${rota}. You will receive weather updates on your rota working days. To change your rota, use the /settings command.`;
 }
 
-export const HELP_MESSAGE = `This bot provides you with instant weather data for CDA and HTTC.
-It'll send you updates automatically every weekday at 09:50, 11:50, 13:50, and 15:50 Singapore time every weekday.
+export const HELP_MESSAGE = `🤖 *CDA ARMS Weather Bot — Help*
 
-Just type /start to begin.
+This bot sends you WBGT and heat stress updates for CDA and HTTC, 10 minutes before each ARMS Weather Report deadline — so you don't have to manually check myENV.
 
-Use /settings to check your bot version.
-
-If you want to stop receiving updates, type /stop.
-`;
+Reports are sent every weekday at 09:50, 11:50, 13:50, and 15:50 SGT.`;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -159,11 +159,40 @@ function getErrorMessage(error: unknown): string {
   return 'Unknown error';
 }
 
-export function buildWeatherFetchFailedMessage(error: unknown): string {
-  return `Failed to fetch weather data.\nStatus code: ${getStatusCode(error)}\nError: ${getErrorMessage(error)}\n\nPlease retry with /weather`;
+export function buildEscapedWeatherReply(
+  readings: WeatherReadings,
+  options?: {
+    jobDate?: Date;
+    nextUpdate?: Date;
+  },
+) {
+  const reply = buildWeatherReply(
+    {
+      heatStress: readings.cdaWBGT.heatStress,
+      wbgt: readings.cdaWBGT.wbgt,
+      airTemp: readings.cdaAirTemp.value,
+      emoji: getWBGTEmoji(readings.cdaWBGT.heatStress),
+      dateTime: readings.cdaWBGT.dateTime,
+    },
+    {
+      heatStress: readings.httcWBGT.heatStress,
+      wbgt: readings.httcWBGT.wbgt,
+      airTemp: readings.httcAirTemp.value,
+      emoji: getWBGTEmoji(readings.httcWBGT.heatStress),
+      dateTime: readings.httcWBGT.dateTime,
+    },
+    options,
+  );
+
+  return escapeMarkdownV2(reply);
 }
 
-export const STOP_SUCCESS_MESSAGE =
-  'You have been unsubscribed from weather updates. Use /start to subscribe to the updates again.';
+export function buildWeatherFetchFailedMessage(error: unknown): string {
+  return `⚠️ Couldn't fetch weather data. Please try /weather again in a few moments.\n\nStatus: ${getStatusCode(error)}\nError: ${getErrorMessage(error)}`;
+}
+
+export const NOT_SUBSCRIBED_MESSAGE = `You're not subscribed to any weather updates. Use /start to get set up.`;
+
+export const STOP_SUCCESS_MESSAGE = `✅ You've been unsubscribed from weather updates. Use /start anytime to resubscribe.`;
 
 export const LOADING_MESSAGE = '⏳ Loading...';

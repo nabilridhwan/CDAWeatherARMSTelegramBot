@@ -1,137 +1,32 @@
 import schedule from 'node-schedule';
 import { Markup, Telegraf } from 'telegraf';
-import { getAirTempFromLatLng, getWGBTFromLatLng } from '../../api/weather';
-import logger from '../infra/logger';
-import redis from '../infra/redis';
-import { buildSettingsMessage } from '../infra/version';
-import getRotaNumberForDate from '../schedule/getRotaNumber';
-import getWBGTEmoji from '../weather/getWBGTEmoji';
-import { CDA, HTTC } from '../weather/locations';
 import {
   buildAlreadySubscribedMessage,
+  buildEscapedWeatherReply,
   buildRotaSetSuccessMessage,
+  buildSettingsMessages,
   buildWeatherFetchFailedMessage,
-  buildWeatherReply,
-  CHANGE_ROTA_MESSAGE,
-  escapeMarkdownV2,
   HELP_MESSAGE,
   LOADING_MESSAGE,
   STOP_SUCCESS_MESSAGE,
   WELCOME_SUBSCRIBED_MESSAGE,
-} from './replies';
+} from './utils/bot/replies';
+import {
+  getChatSubscriptionRota,
+  getSubscribedChatIdsForDate,
+  removeChatFromAllSubscriptions,
+  setRotaSubscription,
+  SubscriptionRota,
+} from './utils/bot/subscriptions';
+import logger from './utils/infra/logger';
+import { generateVersionInfoMessage } from './utils/infra/version';
+import fetchWeatherReadings from './utils/weather/fetchWeatherReadings';
 
 export const bot = new Telegraf(process.env.BOT_ID!);
 
-const SUBSCRIBED_CHAT_IDS_KEY = 'subscribed_chat_ids';
-const SUBSCRIBED_CHAT_IDS_ROTA_PREFIX = 'subscribed_chat_ids_rota_';
-
-type RotaNumber = 1 | 2 | 3;
-type WbgtReading = Awaited<ReturnType<typeof getWGBTFromLatLng>>;
-type AirTempReading = Awaited<ReturnType<typeof getAirTempFromLatLng>>;
-
-type WeatherReadings = {
-  cdaWBGT: WbgtReading;
-  cdaAirTemp: AirTempReading;
-  httcWBGT: WbgtReading;
-  httcAirTemp: AirTempReading;
-};
-
-function getRotaSubscriptionKey(rota: RotaNumber) {
-  return `${SUBSCRIBED_CHAT_IDS_ROTA_PREFIX}${rota}`;
-}
-
-async function getAllSubscribedChatIdsForDate(
-  fireDate: Date,
-): Promise<string[]> {
-  const rotaNumber = getRotaNumberForDate(fireDate);
-
-  const [allWeekdaySubscribers, rotaSubscribers] = await Promise.all([
-    redis.smembers(SUBSCRIBED_CHAT_IDS_KEY),
-    redis.smembers(getRotaSubscriptionKey(rotaNumber)),
-  ]);
-
-  return Array.from(new Set([...allWeekdaySubscribers, ...rotaSubscribers]));
-}
-
-async function fetchWeatherReadings(): Promise<WeatherReadings> {
-  const [cdaWBGT, cdaAirTemp, httcWBGT, httcAirTemp] = await Promise.all([
-    getWGBTFromLatLng(CDA.latitude, CDA.longitude),
-    getAirTempFromLatLng(CDA.latitude, CDA.longitude),
-    getWGBTFromLatLng(HTTC.latitude, HTTC.longitude),
-    getAirTempFromLatLng(HTTC.latitude, HTTC.longitude),
-  ]);
-
-  return {
-    cdaWBGT,
-    cdaAirTemp,
-    httcWBGT,
-    httcAirTemp,
-  };
-}
-
-function buildEscapedWeatherReply(
-  readings: WeatherReadings,
-  options?: {
-    jobDate?: Date;
-    nextUpdate?: Date;
-  },
-) {
-  const reply = buildWeatherReply(
-    {
-      heatStress: readings.cdaWBGT.heatStress,
-      wbgt: readings.cdaWBGT.wbgt,
-      airTemp: readings.cdaAirTemp.value,
-      emoji: getWBGTEmoji(readings.cdaWBGT.heatStress),
-      dateTime: readings.cdaWBGT.dateTime,
-    },
-    {
-      heatStress: readings.httcWBGT.heatStress,
-      wbgt: readings.httcWBGT.wbgt,
-      airTemp: readings.httcAirTemp.value,
-      emoji: getWBGTEmoji(readings.httcWBGT.heatStress),
-      dateTime: readings.httcWBGT.dateTime,
-    },
-    options,
-  );
-
-  return escapeMarkdownV2(reply);
-}
-
-async function removeChatFromAllSubscriptions(chatId: number) {
-  await Promise.all([
-    redis.srem(SUBSCRIBED_CHAT_IDS_KEY, chatId),
-    redis.srem(getRotaSubscriptionKey(1), chatId),
-    redis.srem(getRotaSubscriptionKey(2), chatId),
-    redis.srem(getRotaSubscriptionKey(3), chatId),
-  ]);
-}
-
-function parseRotaFromCommand(text: string): {
-  rota: RotaNumber | null;
-  isInvalidFormat: boolean;
-} {
-  const rotaStr = text.split(' ').slice(1)[0];
-  const rota = Number(rotaStr);
-
-  if (!rotaStr || Number.isNaN(rota)) {
-    return {
-      rota: null,
-      isInvalidFormat: true,
-    };
-  }
-
-  if (![1, 2, 3].includes(rota)) {
-    return {
-      rota: null,
-      isInvalidFormat: false,
-    };
-  }
-
-  return {
-    rota: rota as RotaNumber,
-    isInvalidFormat: false,
-  };
-}
+// ==============================
+// Scheduled job to send weather updates
+// ==============================
 
 // Cron rule to run every weekday at 09:50, 11:50, 13:50, and 15:50 in Singapore timezone
 const rule = new schedule.RecurrenceRule();
@@ -142,7 +37,7 @@ rule.tz = 'Singapore';
 
 export const job = schedule.scheduleJob(rule, async (fireDate) => {
   try {
-    const subscribedChatIds = await getAllSubscribedChatIdsForDate(fireDate);
+    const subscribedChatIds = await getSubscribedChatIdsForDate(fireDate);
 
     if (subscribedChatIds.length === 0) {
       logger.info('No subscribed chat IDs found. Skipping weather report.');
@@ -189,36 +84,24 @@ export const job = schedule.scheduleJob(rule, async (fireDate) => {
   }
 });
 
+// ==============================
+// Bot command and action handlers
+// ==============================
+
 bot.start(async (ctx) => {
   logger.info(
     `Start command called by Chat ID: ${ctx.chat.id}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', { timeZone: 'Asia/Singapore' })}`,
   );
 
-  const [
-    isSubscribedOfficeHours,
-    isSubscribedToRota1,
-    isSubscribedToRota2,
-    isSubscribedToRota3,
-  ] = await Promise.all([
-    redis.sismember(SUBSCRIBED_CHAT_IDS_KEY, ctx.chat.id),
-    redis.sismember(getRotaSubscriptionKey(1), ctx.chat.id),
-    redis.sismember(getRotaSubscriptionKey(2), ctx.chat.id),
-    redis.sismember(getRotaSubscriptionKey(3), ctx.chat.id),
-  ]);
-
-  const hasSubscribedToAnyChat =
-    isSubscribedOfficeHours == 1 ||
-    isSubscribedToRota1 == 1 ||
-    isSubscribedToRota2 == 1 ||
-    isSubscribedToRota3 == 1;
+  const subscriptionRota = await getChatSubscriptionRota(ctx.chat.id);
+  const rotaNumber: SubscriptionRota | null = subscriptionRota;
+  const hasSubscribedToAnyChat = rotaNumber !== null;
 
   if (hasSubscribedToAnyChat) {
-    const msg = buildAlreadySubscribedMessage({
-      isSubscribedToRota1,
-      isSubscribedToRota2,
-      isSubscribedToRota3,
-      nextUpdate: new Date(job.nextInvocation()),
-    });
+    const msg = buildAlreadySubscribedMessage(
+      rotaNumber,
+      new Date(job.nextInvocation()),
+    );
 
     ctx.telegram.sendMessage(ctx.chat.id, msg, undefined);
 
@@ -231,18 +114,23 @@ bot.start(async (ctx) => {
   ctx.telegram.sendMessage(
     ctx.chat.id,
     WELCOME_SUBSCRIBED_MESSAGE,
-    Markup.inlineKeyboard([
-      Markup.button.callback('Rota 1', 'set_rota_1'),
-      Markup.button.callback('Rota 2', 'set_rota_2'),
-      Markup.button.callback('Rota 3', 'set_rota_3'),
-      Markup.button.callback('Office Hours', 'set_office_hours'),
-    ]),
+    Markup.inlineKeyboard(
+      [
+        Markup.button.callback('Rota 1', 'set_rota_1'),
+        Markup.button.callback('Rota 2', 'set_rota_2'),
+        Markup.button.callback('Rota 3', 'set_rota_3'),
+        Markup.button.callback('Office Hours', 'set_office_hours'),
+      ],
+      { columns: 1 },
+    ),
   );
 
   logger.info('Added Chat ID: ' + ctx.chat.id + ' to subscribed chat IDs.');
 });
 
-// handler for set_rota_1, set_rota_2, set_rota_3, and set_office_hours callback buttons
+// ==============================
+// Callback query handlers for setting rota subscriptions
+// ==============================
 bot.action('set_rota_1', async (ctx) => {
   await assignRota(1, ctx);
   ctx.editMessageText(buildRotaSetSuccessMessage(1));
@@ -269,35 +157,32 @@ bot.action('set_office_hours', async (ctx) => {
 });
 
 bot.action('stop_updates', async (ctx) => {
-  await stopUpdates(ctx);
+  if (!ctx.chat) return;
+  try {
+    await removeChatFromAllSubscriptions(ctx.chat.id);
+  } catch (err) {
+    logger.error(`Failed to remove chat ID from subscriptions: ${err}`);
+  }
   ctx.editMessageText(STOP_SUCCESS_MESSAGE);
   ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
 });
 
-async function stopUpdates(ctx: any) {
+async function assignRota(rotaNumber: SubscriptionRota, ctx: any) {
   try {
-    await removeChatFromAllSubscriptions(ctx.chat.id);
+    await setRotaSubscription(ctx.chat.id, rotaNumber);
   } catch (err) {
-    logger.error(`Failed to remove chat ID from other rota sets: ${err}`);
+    logger.error(`Failed to set rota subscription: ${err}`);
     return;
   }
-}
-
-async function assignRota(rotaNumber: RotaNumber | 'office_hours', ctx: any) {
-  await stopUpdates(ctx);
 
   if (rotaNumber === 'office_hours') {
-    await redis.sadd(SUBSCRIBED_CHAT_IDS_KEY, ctx.chat.id);
     ctx.reply(
       'You have been subscribed to receive updates every weekday during office hours. You will receive updates on all weekdays without rota differentiation.',
     );
-    logger.info(`Set Chat ID: ${ctx.chat.id} to Office Hours subscription.`);
     return;
   }
 
-  await redis.sadd(getRotaSubscriptionKey(rotaNumber), ctx.chat.id);
   ctx.reply(buildRotaSetSuccessMessage(rotaNumber));
-  logger.info(`Set Chat ID: ${ctx.chat.id} to Rota ${rotaNumber}.`);
 }
 
 bot.command('weather', async (ctx) => {
@@ -346,16 +231,24 @@ bot.command('weather', async (ctx) => {
 bot.command('stop', async (ctx) => {
   const chatId = ctx.chat.id;
   await removeChatFromAllSubscriptions(chatId);
-
   await ctx.reply(STOP_SUCCESS_MESSAGE);
-
   logger.info(`Stop command called by Chat ID: ${chatId}.`);
 });
 
-bot.command('settings', (ctx) => {
+bot.command('settings', async (ctx) => {
+  const rotaNumber = await getChatSubscriptionRota(ctx.chat.id);
+
+  if (rotaNumber === null) {
+    await ctx.telegram.sendMessage(
+      ctx.chat.id,
+      'You are not currently subscribed to any schedule. Use /start to subscribe.',
+    );
+    return;
+  }
+
   ctx.telegram.sendMessage(
     ctx.chat.id,
-    CHANGE_ROTA_MESSAGE + '\n\n' + buildSettingsMessage(),
+    buildSettingsMessages(rotaNumber) + '\n\n' + generateVersionInfoMessage(),
     Markup.inlineKeyboard(
       [
         Markup.button.callback('Rota 1', 'set_rota_1'),
