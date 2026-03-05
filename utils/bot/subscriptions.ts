@@ -10,7 +10,7 @@ const SUBSCRIBED_CHAT_IDS_KEY = 'subscribed_chat_ids';
 const SUBSCRIBED_CHAT_IDS_ROTA_PREFIX = 'subscribed_chat_ids_rota_';
 
 export type RotaNumber = 1 | 2 | 3;
-export type SubscriptionRota = RotaNumber | 'office_hours';
+export type WorkingSchedule = RotaNumber | 'office_hours';
 type WbgtReading = Awaited<ReturnType<typeof getWGBTFromLatLng>>;
 type AirTempReading = Awaited<ReturnType<typeof getAirTempFromLatLng>>;
 
@@ -97,7 +97,7 @@ export async function getSubscribedChatIdsForDate(
 
 export async function getChatSubscriptionRota(
   chatId: number,
-): Promise<SubscriptionRota | null> {
+): Promise<WorkingSchedule | null> {
   const [
     isSubscribedOfficeHours,
     isSubscribedToRota1,
@@ -140,7 +140,7 @@ export async function removeChatFromAllSubscriptions(chatId: number) {
 
 export async function setRotaSubscription(
   chatId: number,
-  rotaNumber: SubscriptionRota,
+  rotaNumber: WorkingSchedule,
 ): Promise<void> {
   await removeChatFromAllSubscriptions(chatId);
 

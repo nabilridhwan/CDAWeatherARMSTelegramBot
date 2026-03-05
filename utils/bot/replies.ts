@@ -1,6 +1,8 @@
+import { job } from '../../bot';
+import getNextUpdateDateForRota from '../schedule/getNextUpdateDateForRota';
 import { WeatherReadings } from '../weather/fetchWeatherReadings';
 import getWBGTEmoji from '../weather/getWBGTEmoji';
-import { SubscriptionRota } from './subscriptions';
+import { WorkingSchedule } from './subscriptions';
 
 type WeatherSnapshot = {
   heatStress: string;
@@ -39,7 +41,7 @@ export function buildWeatherReply(
 }
 
 export function buildAlreadySubscribedMessage(
-  rotaNumber: SubscriptionRota,
+  rotaNumber: WorkingSchedule,
   nextUpdate: Date,
 ) {
   const schedule =
@@ -87,12 +89,20 @@ export const INVALID_ROTA_RANGE_MESSAGE =
 export const SETROTA_ERROR_MESSAGE =
   'An error occurred while setting your rota. Please try again later.';
 
-export function buildRotaSetSuccessMessage(rota: number | 'office_hours') {
+export function buildRotaSetSuccessMessage(rota: WorkingSchedule) {
+  const date = getNextUpdateDateForRota(rota) ?? new Date(job.nextInvocation());
+
   if (rota === 'office_hours') {
-    return `✅ You're subscribed to Office Hours. You will receive weather updates every weekday. To change your schedule or stop updates, use the /settings command.`;
+    return `✅ You're subscribed to Office Hours. You will receive weather updates every weekday. To change your schedule or stop updates, use the /settings command.
+    
+Next update: ${formatSingaporeDate(date)}
+    `;
   }
 
-  return `✅ You're subscribed to Rota ${rota}. You will receive weather updates on your rota working days. To change your rota or stop updates, use the /settings command.`;
+  return `✅ You're subscribed to Rota ${rota}. You will receive weather updates on your rota working days. To change your rota or stop updates, use the /settings command.
+
+Next update: ${formatSingaporeDate(date)}
+  `;
 }
 
 export const HELP_MESSAGE = `🤖 *CDA ARMS Weather Bot — Help*

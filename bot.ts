@@ -16,7 +16,7 @@ import {
   getSubscribedChatIdsForDate,
   removeChatFromAllSubscriptions,
   setRotaSubscription,
-  SubscriptionRota,
+  WorkingSchedule,
 } from './utils/bot/subscriptions';
 import logger from './utils/infra/logger';
 import { generateVersionInfoMessage } from './utils/infra/version';
@@ -95,7 +95,7 @@ bot.start(async (ctx) => {
   );
 
   const subscriptionRota = await getChatSubscriptionRota(ctx.chat.id);
-  const rotaNumber: SubscriptionRota | null = subscriptionRota;
+  const rotaNumber: WorkingSchedule | null = subscriptionRota;
   const hasSubscribedToAnyChat = rotaNumber !== null;
 
   if (hasSubscribedToAnyChat) {
@@ -168,7 +168,7 @@ bot.action('stop_updates', async (ctx) => {
   ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
 });
 
-async function assignRota(rotaNumber: SubscriptionRota, ctx: any) {
+async function assignRota(rotaNumber: WorkingSchedule, ctx: any) {
   try {
     await setRotaSubscription(ctx.chat.id, rotaNumber);
   } catch (err) {

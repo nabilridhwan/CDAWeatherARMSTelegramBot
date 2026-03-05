@@ -1,9 +1,9 @@
 import { rule } from '../../bot';
-import { SubscriptionRota } from '../bot/subscriptions';
+import { WorkingSchedule } from '../bot/subscriptions';
 import getRotaNumberForDate from './getRotaNumber';
 
 export default function getNextUpdateDateForRota(
-  rota: SubscriptionRota,
+  rota: WorkingSchedule,
   fromDate: Date = new Date(),
 ): Date | null {
   let cursor = fromDate;
