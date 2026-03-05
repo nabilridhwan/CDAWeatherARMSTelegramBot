@@ -89,17 +89,19 @@ export const SETROTA_ERROR_MESSAGE =
 
 export function buildRotaSetSuccessMessage(rota: number | 'office_hours') {
   if (rota === 'office_hours') {
-    return `✅ You're subscribed to Office Hours. You will receive weather updates every weekday. To change your schedule, use the /settings command.`;
+    return `✅ You're subscribed to Office Hours. You will receive weather updates every weekday. To change your schedule or stop updates, use the /settings command.`;
   }
 
-  return `✅ You're subscribed to Rota ${rota}. You will receive weather updates on your rota working days. To change your rota, use the /settings command.`;
+  return `✅ You're subscribed to Rota ${rota}. You will receive weather updates on your rota working days. To change your rota or stop updates, use the /settings command.`;
 }
 
 export const HELP_MESSAGE = `🤖 *CDA ARMS Weather Bot — Help*
 
 This bot sends you WBGT and heat stress updates for CDA and HTTC, 10 minutes before each ARMS Weather Report deadline — so you don't have to manually check myENV.
 
-Reports are sent every weekday at 09:50, 11:50, 13:50, and 15:50 SGT.`;
+Reports are sent every weekday at 09:50, 11:50, 13:50, and 15:50 SGT.
+
+Use /settings to change your schedule or stop receiving updates.`;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

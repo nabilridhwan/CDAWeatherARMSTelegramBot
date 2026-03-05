@@ -169,17 +169,7 @@ async function assignRota(rotaNumber: SubscriptionRota, ctx: any) {
     await setRotaSubscription(ctx.chat.id, rotaNumber);
   } catch (err) {
     logger.error(`Failed to set rota subscription: ${err}`);
-    return;
   }
-
-  if (rotaNumber === 'office_hours') {
-    ctx.reply(
-      'You have been subscribed to receive updates every weekday during office hours. You will receive updates on all weekdays without rota differentiation.',
-    );
-    return;
-  }
-
-  ctx.reply(buildRotaSetSuccessMessage(rotaNumber));
 }
 
 bot.command('weather', async (ctx) => {
