@@ -1,133 +1,136 @@
-# CDA Weather ARMS Telegram Bot
+# CDA Weather ARMS Bot
 
-Telegram bot for ARMS weather updates at **CDA** and **HTTC** using Singapore real-time weather datasets.
+A Telegram bot that automates ARMS weather report checks for personnel at **Civil Defence Academy (CDA)** and **Home Team Tactical Centre (HTTC)** in Singapore. Eliminates the need to manually check the myENV app before every ARMS Weather Report deadline.
 
 <img src="docs/welcome.png" width="300" />
-<img src="docs/weather-update.png" width="300" />
+<img src="docs/weather.png" width="300" />
 
-## Overview
+## Features
 
-This project delivers weather notifications to Telegram chats on a fixed weekday schedule and on demand.
+- **Scheduled weather updates** — Sends heat stress readings every weekday at 09:50, 11:50, 13:50, and 15:50 (Singapore time), timed around ARMS reporting windows.
+- **On-demand weather snapshot** — Fetch live readings anytime via `/weather` without waiting for the next scheduled push.
+- **Rota-based subscription** — Subscribe to a specific 3-day rota cycle so you only receive updates on your duty days.
+- **Heat stress emoji indicators** — At-a-glance WBGT status: 🟢 Low, 🟡 Moderate, 🔴 High/Very High, ⚪ Unknown.
+- **Redis-backed subscriptions** — Chat subscriptions persist across restarts using Redis sets.
+- **Secure webhook** — Telegram webhook is protected by a runtime-generated secret token validated on every request.
+- **Health and log endpoints** — Operational visibility via `/health` and `/logs` HTTP endpoints.
+- **Graceful shutdown** — Handles `SIGINT` and `SIGTERM` cleanly; scheduler is cancelled before process exit.
 
-- Sends scheduled weather snapshots at **09:50, 11:50, 13:50, 15:50** (Singapore time, weekdays).
-- Supports on-demand updates via `/weather`.
-- Supports rota-targeted subscriptions via `/setrota 1|2|3`.
-- Uses Redis sets for chat subscription persistence.
-- Uses a secure Telegram webhook with runtime-generated secret token validation.
+## Quick Start (User)
 
-## What the Bot Sends
-
-Each weather message includes:
-
-- CDA heat stress, WBGT, and air temperature.
-- HTTC heat stress, WBGT, and air temperature.
-- Last updated timestamp.
-- For scheduled jobs: job date and next update timestamp.
-
-Heat stress is converted to status emojis:
-
-- `Low` → 🟢
-- `Moderate` → 🟡
-- `High / Very High` → 🔴
-- Unknown → ⚪
+1. Open Telegram: [@cda_weather_arms_bot](https://t.me/cda_weather_arms_bot)
+2. Send `/start` and select your schedule.
 
 ## User Commands
 
-- `/start`  
-   Subscribes chat to all weekday scheduled updates (unless already subscribed).
-
-- `/setrota <1|2|3>`  
-   Unsubscribes chat from all existing sets, then subscribes chat to one rota set.
-
-- `/weather`  
-   Sends immediate weather snapshot for CDA + HTTC.
-
-- `/settings`  
-   Shows current bot version (supports commit hash and custom version override).
-
-- `/stop`  
-   Unsubscribes chat from all subscription sets.
-
-- `/help`  
-   Shows bot usage information.
+| Command | Description |
+|---|---|
+| `/start` | Subscribe to all weekday scheduled updates. Shows rota selection buttons if not yet subscribed. |
+| `/weather` | Send an immediate weather snapshot for CDA and HTTC. |
+| `/settings` | View current subscription status, rota, and bot version. Provides buttons to change schedule or unsubscribe. |
+| `/help` | Display usage information. |
 
 ## Rota Logic
 
-Rota cycle is a 3-day repeating sequence based on reference date:
+The rota follows a 3-day repeating cycle anchored to a known reference date:
 
-- Reference date: `2025-10-06T00:00:00+08:00` = **Rota 3**
-- Next days cycle as: **3 → 2 → 1 → 3 ...**
+- Reference: `2025-10-06T00:00:00+08:00` = **Rota 3**
+- Cycle order: **3 → 2 → 1 → 3 → ...**
 
-On each scheduled run, recipients are:
+On each scheduled run, the bot sends to:
 
-1. All weekday subscribers, plus
-2. Subscribers of the rota that matches the job date
+1. All weekday subscribers (office hours subscription).
+2. Subscribers of the rota that matches the current job date.
 
-Duplicates are automatically removed before sending.
+Duplicates across both groups are removed automatically before sending.
+
+## What the Bot Sends
+
+Each weather message includes, for both CDA and HTTC:
+
+- Heat stress level with status emoji
+- WBGT (Wet Bulb Globe Temperature) in °C
+- Air temperature in °C
+- Last updated timestamp (Singapore time)
+
+Scheduled messages additionally include the current job date and the timestamp of the next scheduled update.
 
 ## Architecture
 
 ### Runtime flow
 
-1. Express server starts.
-2. Telegraf webhook is registered at `/telegram-webhook`.
-3. Incoming webhook requests are validated with `X-Telegram-Bot-Api-Secret-Token`.
-4. Scheduled job runs on cron-like rule (weekday 09:50/11:50/13:50/15:50, Singapore).
-5. Weather data is fetched in parallel for both locations.
-6. Message is formatted (MarkdownV2-safe) and sent to subscribed chats.
+1. Express server starts and generates a runtime secret token.
+2. Telegraf webhook is registered at `/telegram-webhook` with secret token validation.
+3. Scheduled job fires on cron rule: weekdays at 09:50, 11:50, 13:50, 15:50 (Asia/Singapore).
+4. Bot queries Redis for all applicable subscribers (office hours + rota match).
+5. Weather data is fetched in parallel for CDA and HTTC from data.gov.sg APIs.
+6. Message is MarkdownV2-formatted and fanned out to all subscribed chats.
 
 ### Data sources
 
-- WBGT API: `https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt`
-- Air Temperature API: `https://api-open.data.gov.sg/v2/real-time/api/air-temperature`
+- **WBGT**: `https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt`
+- **Air Temperature**: `https://api-open.data.gov.sg/v2/real-time/api/air-temperature`
 
-For each target location, nearest station is selected using haversine distance.
+The nearest weather station to each target location is resolved using the Haversine distance formula.
+
+### Target coordinates
+
+| Location | Latitude | Longitude |
+|---|---|---|
+| CDA | 1.3659363 | 103.6898665 |
+| HTTC | 1.4063182 | 103.759932 |
 
 ## HTTP Endpoints
 
-- `POST /telegram-webhook`  
-   Telegram webhook handler (secret token validated).
-
-- `GET /health`  
-   Health status, host, subscriber count, and next scheduled update.
-
-- `GET /logs`  
-   Returns application logs from `logs/app.log`.
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/telegram-webhook` | Telegram webhook handler. Validates `X-Telegram-Bot-Api-Secret-Token`. |
+| `GET` | `/health` | Returns status, configured host, subscriber count, and next scheduled update time. |
+| `GET` | `/logs` | Returns application log entries from `logs/app.log` as a JSON array. |
 
 ## Tech Stack
 
-- Node.js + TypeScript
-- Express
-- Telegraf (Telegram Bot API)
-- node-schedule
-- Redis (ioredis)
-- Winston logging
-- Vitest
-- Fly.io (deployment target)
+- **Runtime**: Node.js 20+, TypeScript 5.8
+- **Bot framework**: Telegraf 4.16
+- **HTTP server**: Express 5.1
+- **Scheduling**: node-schedule 2.1
+- **Persistence**: Redis via ioredis 5.6
+- **Weather API**: axios + data.gov.sg open APIs
+- **Distance calculation**: haversine-distance 1.2
+- **Logging**: Winston 3.17
+- **Security**: Helmet 8.1, Node.js crypto
+- **Testing**: Vitest 3.2
+- **Deployment**: Docker + Fly.io (region: `sin`)
 
 ## Project Structure
 
-```text
+```
 .
 ├── api/
-│   ├── weather.ts                # Weather retrieval + nearest-station resolution
-│   └── types/weather.ts
+│   ├── weather.ts                    # Weather fetching + nearest-station resolution
+│   └── types/weather.ts              # TypeScript interfaces for API responses
 ├── utils/
 │   ├── bot/
-│   │   ├── bot.ts                # Telegram handlers + scheduler + fan-out
-│   │   └── replies.ts            # Message templates / formatting
+│   │   ├── replies.ts                # Message templates and MarkdownV2 formatting
+│   │   └── subscriptions.ts          # Redis-backed subscription operations
 │   ├── infra/
-│   │   ├── logger.ts             # Console + file logger
-│   │   └── redis.ts              # Redis client setup
-│   ├── schedule/getRotaNumber.ts # Rota calculation
-│   ├── security/generateSecretToken.ts
+│   │   ├── logger.ts                 # Winston logger (console + file)
+│   │   ├── redis.ts                  # Redis client initialisation
+│   │   └── version.ts                # Version string helper
+│   ├── schedule/
+│   │   ├── getRotaNumber.ts          # Derive current rota from date
+│   │   └── getNextUpdateDateForRota.ts # Find next scheduled update for a rota
+│   ├── security/
+│   │   └── generateSecretToken.ts    # Runtime secret token generation
 │   └── weather/
-│       ├── getWBGTEmoji.ts
-│       └── locations.ts
+│       ├── fetchWeatherReadings.ts   # Parallel weather fetch for both locations
+│       ├── getWBGTEmoji.ts           # Heat stress level to emoji mapping
+│       └── locations.ts              # CDA and HTTC coordinates
 ├── tests/
 │   ├── api/weather.test.ts
-│   └── utils/*.test.ts
-├── index.ts                      # App bootstrap + webhook + health/log routes
+│   └── utils/                        # Unit tests for schedule, formatting, emoji
+├── bot.ts                            # Telegraf bot handlers + scheduled job + fan-out
+├── index.ts                          # App bootstrap, webhook route, health/log routes
 ├── Dockerfile
 └── fly.toml
 ```
@@ -136,122 +139,66 @@ For each target location, nearest station is selected using haversine distance.
 
 - Node.js 20+
 - npm
-- A reachable host URL for Telegram webhook registration
+- A publicly reachable host URL (required for Telegram webhook registration)
 - Telegram Bot token
 - Redis instance
 - data.gov.sg API key
 
-## Environment Variables
-
-Create a `.env` file in project root:
-
-```bash
-# Telegram
-BOT_ID=<telegram_bot_token>
-
-# Optional: override version shown by /settings
-BOT_VERSION=<custom_version_label>
-
-# App URL used for webhook registration
-HOST=https://your-domain.example.com
-
-# Server
-PORT=8080
-
-# Data.gov.sg
-DATA_GOV_API_KEY=<your_data_gov_api_key>
-
-# Redis
-REDIS_HOST=<redis_host>
-REDIS_PORT=6379
-REDIS_PASSWORD=<redis_password_if_any>
-```
-
-Notes:
-
-- `SECRET_TOKEN` is generated at runtime and used to validate webhook requests.
-- If `HOST` is missing, default webhook URL uses `http://localhost:8080`.
-
 ## Local Development
 
-Install dependencies:
-
 ```bash
+# Install dependencies
 npm install
-```
 
-Build project:
-
-```bash
+# Build TypeScript
 npm run build
-```
 
-Run app (build + start):
-
-```bash
+# Build and start
 npm start
-```
 
-Run tests:
-
-```bash
+# Run tests
 npm test
 ```
 
 ## Docker
 
-Build image:
-
 ```bash
+# Build image
 docker build -t cda-weather-arms-bot .
-```
 
-Run container:
-
-```bash
+# Run container
 docker run --rm -p 8080:8080 --env-file .env cda-weather-arms-bot
 ```
 
 ## Deployment (Fly.io)
 
-This repository includes `fly.toml` configured for region `sin` and internal port `8080`.
+The repository includes `fly.toml` configured for region `sin` and internal port `8080`.
 
-Typical deploy flow:
-
-1. Set required secrets/env vars on Fly.
-2. Deploy app.
-3. Confirm `/health` is returning status `ok`.
-4. Ensure Telegram webhook reaches `<HOST>/telegram-webhook`.
+1. Set all required secrets and environment variables on Fly.
+2. Run `fly deploy`.
+3. Confirm `GET /health` returns `{ "status": "ok" }`.
+4. Verify Telegram webhook is reaching `<HOST>/telegram-webhook`.
 
 ## Operational Notes
 
-- Logs are written to console and `logs/app.log`.
-- Graceful shutdown handles `SIGINT` and `SIGTERM`.
-- On `uncaughtException`/`unhandledRejection`, scheduler is cancelled and process exits with non-zero status.
-- If no subscribed chats exist at schedule time, send is skipped.
+- Logs are written to both console and `logs/app.log`.
+- Graceful shutdown is handled on `SIGINT` and `SIGTERM`.
+- On `uncaughtException` or `unhandledRejection`, the scheduler is cancelled and the process exits with a non-zero status code.
+- If no subscribers exist at schedule time, the send step is skipped entirely.
+- `SECRET_TOKEN` is generated fresh at each startup; it is never stored or logged.
 
 ## Testing Coverage
 
-Current tests cover:
-
-- Nearest-station weather selection and fallback behavior.
-- Reply formatting and Markdown escaping.
-- Rota calculation cycle behavior.
-- Heat-stress emoji mapping.
-
-## Quick Start (User)
-
-1. Open Telegram: [@cda_weather_arms_bot](https://t.me/cda_weather_arms_bot)
-2. Send `/start`
-3. Optional: set rota via `/setrota 1`, `/setrota 2`, or `/setrota 3`
-4. Use `/weather` anytime for immediate update
+- Nearest-station weather selection and fallback behaviour.
+- Reply formatting and MarkdownV2 escaping.
+- Rota cycle calculation.
+- Next update date derivation per rota.
+- Heat stress emoji mapping.
 
 ## Contributing
 
-Contributions are welcome.
-
 1. Fork and clone the repository.
 2. Create a feature branch.
-3. Add/adjust tests with your changes.
-4. Run `npm test`.
-5. Open a pull request with clear summary and rationale.
+3. Add or update tests alongside your changes.
+4. Run `npm test` and confirm all tests pass.
+5. Open a pull request with a clear summary and rationale.

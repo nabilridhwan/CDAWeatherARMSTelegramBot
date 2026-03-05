@@ -88,12 +88,6 @@ You are currently on *${schedule}* and will receive weather updates accordingly.
 To change your schedule, select a different option below. To stop updates, press the *Stop Updates* button below.`;
 }
 
-export const INVALID_ROTA_MESSAGE =
-  'Please provide a valid rota number (1, 2, or 3). Example: /setrota 1';
-
-export const INVALID_ROTA_RANGE_MESSAGE =
-  'Invalid rota number. Please provide a valid rota number (1, 2, or 3). Example: /setrota 1';
-
 export const SETROTA_ERROR_MESSAGE =
   'An error occurred while setting your rota. Please try again later.';
 
