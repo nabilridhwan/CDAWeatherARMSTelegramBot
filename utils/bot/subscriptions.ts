@@ -6,8 +6,17 @@ import getWBGTEmoji from '../weather/getWBGTEmoji';
 import { CDA, HTTC } from '../weather/locations';
 import { buildWeatherReply, escapeMarkdownV2 } from './replies';
 
-const SUBSCRIBED_CHAT_IDS_KEY = 'subscribed_chat_ids';
-const SUBSCRIBED_CHAT_IDS_ROTA_PREFIX = 'subscribed_chat_ids_rota_';
+const environment = process.env.NODE_ENV == 'production' ? 'prod' : 'dev';
+
+const REDIS_KEY_OFFICE_HOURS_CHAT_IDS =
+  `${environment}:chat_ids:office_hours` as const;
+const REDIS_KEY_ROTA_CHAT_IDS_PREFIX = `${environment}:chat_ids:rota_` as const;
+
+type ChatIDRedisKey =
+  | `prod:chat_ids:rota_${RotaNumber}`
+  | `prod:chat_ids:office_hours`
+  | `dev:chat_ids:rota_${RotaNumber}`
+  | `dev:chat_ids:office_hours`;
 
 export type RotaNumber = 1 | 2 | 3;
 export type WorkingSchedule = RotaNumber | 'office_hours';
@@ -21,8 +30,8 @@ type WeatherReadings = {
   httcAirTemp: AirTempReading;
 };
 
-function getRotaSubscriptionKey(rota: RotaNumber) {
-  return `${SUBSCRIBED_CHAT_IDS_ROTA_PREFIX}${rota}`;
+function getRotaSubscriptionKey(rota: RotaNumber): ChatIDRedisKey {
+  return `${REDIS_KEY_ROTA_CHAT_IDS_PREFIX}${rota}`;
 }
 
 export async function getAllSubscribedChatIdsForDate(
@@ -31,7 +40,7 @@ export async function getAllSubscribedChatIdsForDate(
   const rotaNumber = getRotaNumberForDate(fireDate);
 
   const [allWeekdaySubscribers, rotaSubscribers] = await Promise.all([
-    redis.smembers(SUBSCRIBED_CHAT_IDS_KEY),
+    redis.smembers(REDIS_KEY_OFFICE_HOURS_CHAT_IDS),
     redis.smembers(getRotaSubscriptionKey(rotaNumber)),
   ]);
 
@@ -88,7 +97,7 @@ export async function getSubscribedChatIdsForDate(
   const rotaNumber = getRotaNumberForDate(fireDate);
 
   const [allWeekdaySubscribers, rotaSubscribers] = await Promise.all([
-    redis.smembers(SUBSCRIBED_CHAT_IDS_KEY),
+    redis.smembers(REDIS_KEY_OFFICE_HOURS_CHAT_IDS),
     redis.smembers(getRotaSubscriptionKey(rotaNumber)),
   ]);
 
@@ -104,7 +113,7 @@ export async function getChatSubscriptionRota(
     isSubscribedToRota2,
     isSubscribedToRota3,
   ] = await Promise.all([
-    redis.sismember(SUBSCRIBED_CHAT_IDS_KEY, chatId),
+    redis.sismember(REDIS_KEY_OFFICE_HOURS_CHAT_IDS, chatId),
     redis.sismember(getRotaSubscriptionKey(1), chatId),
     redis.sismember(getRotaSubscriptionKey(2), chatId),
     redis.sismember(getRotaSubscriptionKey(3), chatId),
@@ -131,7 +140,7 @@ export async function getChatSubscriptionRota(
 
 export async function removeChatFromAllSubscriptions(chatId: number) {
   await Promise.all([
-    redis.srem(SUBSCRIBED_CHAT_IDS_KEY, chatId),
+    redis.srem(REDIS_KEY_OFFICE_HOURS_CHAT_IDS, chatId),
     redis.srem(getRotaSubscriptionKey(1), chatId),
     redis.srem(getRotaSubscriptionKey(2), chatId),
     redis.srem(getRotaSubscriptionKey(3), chatId),
@@ -145,7 +154,7 @@ export async function setRotaSubscription(
   await removeChatFromAllSubscriptions(chatId);
 
   if (rotaNumber === 'office_hours') {
-    await redis.sadd(SUBSCRIBED_CHAT_IDS_KEY, chatId);
+    await redis.sadd(REDIS_KEY_OFFICE_HOURS_CHAT_IDS, chatId);
     logger.info(`Set Chat ID: ${chatId} to Office Hours subscription.`);
     return;
   }
