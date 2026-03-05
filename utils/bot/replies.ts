@@ -188,7 +188,7 @@ export function buildEscapedWeatherReply(
 }
 
 export function buildWeatherFetchFailedMessage(error: unknown): string {
-  return `⚠️ Couldn't fetch weather data. Please try /weather again in a few moments.\n\nStatus: ${getStatusCode(error)}\nError: ${getErrorMessage(error)}`;
+  return `⚠️ Couldn't fetch weather data. Please try /weather again in a few moments.\n\nStatus code: ${getStatusCode(error)}\nError: ${getErrorMessage(error)}`;
 }
 
 export const NOT_SUBSCRIBED_MESSAGE = `You're not subscribed to any weather updates. Use /start to get set up.`;

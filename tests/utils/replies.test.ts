@@ -74,7 +74,7 @@ describe('replies', () => {
 
     expect(message).toContain('Status code: 503');
     expect(message).toContain('Error: Service unavailable');
-    expect(message).toContain('Please retry with /weather');
+    expect(message).toContain('Please try /weather again in a few moments.');
   });
 
   it('builds weather fetch error message for runtime errors without status code', () => {
@@ -86,6 +86,6 @@ describe('replies', () => {
     expect(message).toContain(
       'Error: Unexpected token } in JSON at position 4',
     );
-    expect(message).toContain('Please retry with /weather');
+    expect(message).toContain('Please try /weather again in a few moments.');
   });
 });
