@@ -114,15 +114,12 @@ bot.start(async (ctx) => {
   ctx.telegram.sendMessage(
     ctx.chat.id,
     WELCOME_SUBSCRIBED_MESSAGE,
-    Markup.inlineKeyboard(
-      [
-        Markup.button.callback('Rota 1', 'set_rota_1'),
-        Markup.button.callback('Rota 2', 'set_rota_2'),
-        Markup.button.callback('Rota 3', 'set_rota_3'),
-        Markup.button.callback('Office Hours', 'set_office_hours'),
-      ],
-      { columns: 1 },
-    ),
+    Markup.inlineKeyboard([
+      Markup.button.callback('Rota 1', 'set_rota_1'),
+      Markup.button.callback('Rota 2', 'set_rota_2'),
+      Markup.button.callback('Rota 3', 'set_rota_3'),
+      Markup.button.callback('Office Hours', 'set_office_hours'),
+    ]),
   );
 
   logger.info('Added Chat ID: ' + ctx.chat.id + ' to subscribed chat IDs.');
@@ -249,16 +246,15 @@ bot.command('settings', async (ctx) => {
   ctx.telegram.sendMessage(
     ctx.chat.id,
     buildSettingsMessages(rotaNumber) + '\n\n' + generateVersionInfoMessage(),
-    Markup.inlineKeyboard(
+    Markup.inlineKeyboard([
       [
         Markup.button.callback('Rota 1', 'set_rota_1'),
         Markup.button.callback('Rota 2', 'set_rota_2'),
         Markup.button.callback('Rota 3', 'set_rota_3'),
         Markup.button.callback('Office Hours', 'set_office_hours'),
-        Markup.button.callback('Stop Updates', 'stop_updates'),
       ],
-      { columns: 1 },
-    ),
+      [Markup.button.callback('Stop Updates', 'stop_updates')],
+    ]),
   );
 });
 
