@@ -20,6 +20,7 @@ import {
 } from './utils/bot/subscriptions';
 import logger from './utils/infra/logger';
 import { generateVersionInfoMessage } from './utils/infra/version';
+import getRotaNumberForDate from './utils/schedule/getRotaNumber';
 import fetchWeatherReadings from './utils/weather/fetchWeatherReadings';
 
 export const bot = new Telegraf(process.env.BOT_ID!);
@@ -84,6 +85,34 @@ export const job = schedule.scheduleJob(rule, async (fireDate) => {
   }
 });
 
+function getNextUpdateForSubscription(
+  subscriptionRota: SubscriptionRota,
+  fromDate: Date = new Date(),
+): Date | null {
+  let cursor = fromDate;
+
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const nextInvocation = rule.nextInvocationDate(cursor);
+
+    if (!nextInvocation) {
+      return null;
+    }
+
+    const nextDate = nextInvocation;
+
+    if (
+      subscriptionRota === 'office_hours' ||
+      getRotaNumberForDate(nextDate) === subscriptionRota
+    ) {
+      return nextDate;
+    }
+
+    cursor = new Date(nextDate.getTime() + 60_000);
+  }
+
+  return null;
+}
+
 // ==============================
 // Bot command and action handlers
 // ==============================
@@ -98,9 +127,13 @@ bot.start(async (ctx) => {
   const hasSubscribedToAnyChat = rotaNumber !== null;
 
   if (hasSubscribedToAnyChat) {
+    const nextUpdateForSubscription =
+      getNextUpdateForSubscription(rotaNumber) ??
+      new Date(job.nextInvocation());
+
     const msg = buildAlreadySubscribedMessage(
       rotaNumber,
-      new Date(job.nextInvocation()),
+      nextUpdateForSubscription,
     );
 
     ctx.telegram.sendMessage(ctx.chat.id, msg, undefined);
