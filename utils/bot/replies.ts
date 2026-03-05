@@ -51,7 +51,7 @@ You are currently on *${schedule}* and will receive weather updates accordingly.
 
 Next update: ${formatSingaporeDate(nextUpdate)}
 
-To change your schedule, use /settings. To unsubscribe, use /stop.`;
+Use /settings to change your schedule or unsubscribe.`;
 }
 
 export const WELCOME_SUBSCRIBED_MESSAGE = `👋🏻 Welcome to the CDA ARMS Weather Bot!
@@ -65,7 +65,7 @@ Reports are sent every weekday at 09:50, 11:50, 13:50, and 15:50 SGT.
 2️⃣ Or select "Office Hours" to receive updates every weekday
 3️⃣ Use /weather anytime to get a live snapshot of the current weather data
 
-Use /stop to unsubscribe at any time.`;
+Use /settings to change your schedule or unsubscribe at any time.`;
 
 export function buildSettingsMessages(rotaNumber: number | 'office_hours') {
   const schedule =
@@ -75,7 +75,7 @@ export function buildSettingsMessages(rotaNumber: number | 'office_hours') {
 
 You are currently on *${schedule}* and will receive weather updates accordingly.
 
-To change your schedule, select a different option below. To unsubscribe, use /stop.`;
+To change your schedule, select a different option below. To stop updates, press the *Stop Updates* button below.`;
 }
 
 export const INVALID_ROTA_MESSAGE =
