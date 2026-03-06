@@ -3,9 +3,13 @@ import express, { type Request, type Response } from 'express';
 import helmet from 'helmet';
 import { readFile } from 'node:fs/promises';
 import { bot, job } from './bot';
+import { version } from './package.json';
 import logger from './utils/infra/logger';
 import redis from './utils/infra/redis';
-import { closeWeatherReportQueue } from './utils/infra/weatherReportQueue';
+import {
+  closeWeatherReportQueue,
+  getWeatherReportQueueCounts,
+} from './utils/infra/weatherReportQueue';
 import './utils/security/generateSecretToken';
 
 configDotenv();
@@ -44,11 +48,26 @@ app.get('/logs', async (req: Request, res: Response) => {
 });
 
 app.get('/health', async (req: any, res: any) => {
+  const environment = process.env.NODE_ENV === 'production' ? 'prod' : 'dev';
+  const subscriptionKeys = [
+    `${environment}:chat_ids:office_hours`,
+    `${environment}:chat_ids:rota_1`,
+    `${environment}:chat_ids:rota_2`,
+    `${environment}:chat_ids:rota_3`,
+  ];
+
+  const [subscribedChatIds, queueCounts] = await Promise.all([
+    redis.sunion(...subscriptionKeys),
+    getWeatherReportQueueCounts(),
+  ]);
+
   return res.status(200).json({
     status: 'ok',
     message: 'Bot is running and healthy.',
+    version,
     host: process.env.HOST,
-    subscribedChatCount: await redis.scard('subscribed_chat_ids'),
+    subscribedChatCount: subscribedChatIds.length,
+    queue: queueCounts,
     nextUpdate: job.nextInvocation()
       ? job
           .nextInvocation()

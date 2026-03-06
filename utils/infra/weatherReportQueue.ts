@@ -201,3 +201,14 @@ export async function closeWeatherReportQueue() {
 
   await weatherReportQueue.close();
 }
+
+export async function getWeatherReportQueueCounts() {
+  return weatherReportQueue.getJobCounts(
+    'waiting',
+    'active',
+    'completed',
+    'failed',
+    'delayed',
+    'paused',
+  );
+}
