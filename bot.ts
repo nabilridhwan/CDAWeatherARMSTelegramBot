@@ -5,7 +5,6 @@ import {
   buildEscapedWeatherReply,
   buildRotaSetSuccessMessage,
   buildSettingsMessages,
-  buildWeatherFetchFailedMessage,
   HELP_MESSAGE,
   LOADING_MESSAGE,
   STOP_SUCCESS_MESSAGE,
@@ -21,18 +20,13 @@ import {
 import logger from './utils/infra/logger';
 import { generateVersionInfoMessage } from './utils/infra/version';
 import {
-  enqueueOnDemandWeatherMessage,
-  enqueueScheduledWeatherMessages,
-  initialiseWeatherReportWorker,
-} from './utils/infra/weatherReportQueue';
+  sendOnDemandWeatherMessage,
+  sendScheduledWeatherMessages,
+} from './utils/infra/weatherReportSender';
 import getNextUpdateDateForRota from './utils/schedule/getNextUpdateDateForRota';
 import fetchWeatherReadings from './utils/weather/fetchWeatherReadings';
 
 export const bot = new Telegraf(process.env.BOT_ID!);
-
-if (process.env.NODE_ENV !== 'test') {
-  initialiseWeatherReportWorker(bot);
-}
 
 // ==============================
 // Scheduled job to send weather updates
@@ -59,10 +53,10 @@ export const job = schedule.scheduleJob(rule, async (fireDate) => {
       jobDate: new Date(fireDate),
     });
 
-    await enqueueScheduledWeatherMessages(subscribedChatIds, escapedReply);
+    await sendScheduledWeatherMessages(bot, subscribedChatIds, escapedReply);
 
     logger.info(
-      'Queued weather report sends for all subscribed chat IDs at ' +
+      'Sent weather reports to all subscribed chat IDs at ' +
         new Date().toLocaleString('en-SG', {
           timeZone: 'Asia/Singapore',
         }),
@@ -175,26 +169,16 @@ bot.command('weather', async (ctx) => {
 
   const loadingMessage = await ctx.reply(LOADING_MESSAGE);
 
-  try {
-    await enqueueOnDemandWeatherMessage(ctx.chat.id, loadingMessage.message_id);
+  await sendOnDemandWeatherMessage(bot, ctx.chat.id, loadingMessage.message_id);
 
-    logger.info(
-      'Queued on-demand weather data for user: ' +
-        ctx.from.username +
-        ' (ID: ' +
-        ctx.from.id +
-        ') in chat ID: ' +
-        ctx.chat.id,
-    );
-  } catch (error) {
-    logger.error('Error queueing on-demand weather data:', error);
-    await ctx.telegram.editMessageText(
+  logger.info(
+    'Processed on-demand weather data for user: ' +
+      ctx.from.username +
+      ' (ID: ' +
+      ctx.from.id +
+      ') in chat ID: ' +
       ctx.chat.id,
-      loadingMessage.message_id,
-      undefined,
-      buildWeatherFetchFailedMessage(error),
-    );
-  }
+  );
 });
 
 bot.command('stop', async (ctx) => {

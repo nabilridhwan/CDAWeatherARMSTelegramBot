@@ -6,10 +6,6 @@ import { bot, job } from './bot';
 import { version } from './package.json';
 import logger from './utils/infra/logger';
 import redis from './utils/infra/redis';
-import {
-  closeWeatherReportQueue,
-  getWeatherReportQueueCounts,
-} from './utils/infra/weatherReportQueue';
 import './utils/security/generateSecretToken';
 
 configDotenv();
@@ -56,17 +52,14 @@ app.get('/health', async (req: any, res: any) => {
     office_hours: `${environment}:chat_ids:office_hours`,
   };
 
-  const [memberStatsEntries, subscribedChatIds, queueCounts] =
-    await Promise.all([
-      Promise.all(
-        Object.entries(subscriptionKeys).map(
-          async ([key, redisKey]) =>
-            [key, await redis.scard(redisKey)] as const,
-        ),
+  const [memberStatsEntries, subscribedChatIds] = await Promise.all([
+    Promise.all(
+      Object.entries(subscriptionKeys).map(
+        async ([key, redisKey]) => [key, await redis.scard(redisKey)] as const,
       ),
-      redis.sunion(...Object.values(subscriptionKeys)),
-      getWeatherReportQueueCounts(),
-    ]);
+    ),
+    redis.sunion(...Object.values(subscriptionKeys)),
+  ]);
 
   const member_stats = Object.fromEntries(memberStatsEntries);
 
@@ -77,7 +70,6 @@ app.get('/health', async (req: any, res: any) => {
     host: process.env.HOST,
     subscribedChatCount: subscribedChatIds.length,
     member_stats,
-    queue: queueCounts,
     nextUpdate: job.nextInvocation()
       ? job
           .nextInvocation()
@@ -106,7 +98,6 @@ async function shutdown(signal: 'SIGINT' | 'SIGTERM', exitCode?: number) {
   bot.stop(signal);
 
   try {
-    await closeWeatherReportQueue();
     await redis.quit();
   } catch (error) {
     logger.error('Error while closing infra during shutdown:', error);

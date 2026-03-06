@@ -13,7 +13,7 @@ This README reflects the current implementation state as of **2026-03-06**.
 - Supports on-demand weather snapshots with `/weather`.
 - Supports schedule subscriptions: `Rota 1`, `Rota 2`, `Rota 3`, or `Office Hours`.
 - Stores chat subscriptions in Redis (environment-scoped keys: `dev:*` or `prod:*`).
-- Queues outbound Telegram messages with BullMQ and processes them in a worker.
+- Sends outbound Telegram messages directly from the bot process (no BullMQ queue).
 - Exposes operational endpoints: `/health` and `/logs`.
 - Uses Telegram webhook secret-token verification (`X-Telegram-Bot-Api-Secret-Token`).
 
@@ -22,7 +22,7 @@ This README reflects the current implementation state as of **2026-03-06**.
 | Command | Description |
 |---|---|
 | `/start` | Shows schedule selection buttons. If already subscribed, returns current schedule and next update. |
-| `/weather` | Queues an immediate weather fetch and edits a loading message with the result. |
+| `/weather` | Fetches weather immediately and edits a loading message with the result. |
 | `/settings` | Shows current schedule, version, and buttons to switch schedule or stop updates. |
 | `/stop` | Removes the chat from all subscriptions. |
 | `/help` | Shows a short usage summary. |
@@ -34,7 +34,7 @@ This README reflects the current implementation state as of **2026-03-06**.
 - Rota cycle anchor is `2025-10-06T00:00:00+08:00` and treated as `Rota 3`.
 - Repeating cycle is `3 -> 2 -> 1`.
 - For each scheduled run, recipients are all `office_hours` subscribers plus subscribers of the computed rota for that run date.
-- Duplicate chat IDs are deduplicated before queueing.
+- Duplicate chat IDs are deduplicated before sending.
 
 ## Weather Data Behavior
 
@@ -55,7 +55,7 @@ This README reflects the current implementation state as of **2026-03-06**.
 | Method | Path | Notes |
 |---|---|---|
 | `POST` | `/telegram-webhook` | Telegraf webhook callback; request token checked against runtime `SECRET_TOKEN`. |
-| `GET` | `/health` | Returns bot status, host, version, subscription counts, queue counts, and next schedule invocation. |
+| `GET` | `/health` | Returns bot status, host, version, subscription counts, and next schedule invocation. |
 | `GET` | `/logs` | Returns `logs/app.log` content split by line as JSON. |
 
 ## Environment Variables
@@ -107,7 +107,7 @@ DATA_GOV_API_KEY=
 │   │   ├── logger.ts
 │   │   ├── redis.ts
 │   │   ├── version.ts
-│   │   └── weatherReportQueue.ts
+│   │   └── weatherReportSender.ts
 │   ├── schedule/
 │   │   ├── getNextUpdateDateForRota.ts
 │   │   └── getRotaNumber.ts
@@ -150,7 +150,7 @@ docker run --rm -p 8080:8080 --env-file .env cda-weather-arms-bot
 After deploy:
 
 1. Ensure `HOST` points to your public Fly URL (used by `setWebhook`).
-2. Check `/health` for status, queue, and subscriber stats.
+2. Check `/health` for status and subscriber stats.
 3. Confirm Telegram is delivering webhook calls to `/telegram-webhook`.
 
 ## Testing Coverage (Current)

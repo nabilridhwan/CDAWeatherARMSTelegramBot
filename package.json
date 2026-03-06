@@ -26,7 +26,6 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "bullmq": "^5.70.4",
     "dotenv": "^17.0.1",
     "express": "^5.1.0",
     "haversine-distance": "^1.2.4",
