@@ -49,17 +49,26 @@ app.get('/logs', async (req: Request, res: Response) => {
 
 app.get('/health', async (req: any, res: any) => {
   const environment = process.env.NODE_ENV === 'production' ? 'prod' : 'dev';
-  const subscriptionKeys = [
-    `${environment}:chat_ids:office_hours`,
-    `${environment}:chat_ids:rota_1`,
-    `${environment}:chat_ids:rota_2`,
-    `${environment}:chat_ids:rota_3`,
-  ];
+  const subscriptionKeys = {
+    rota_1: `${environment}:chat_ids:rota_1`,
+    rota_2: `${environment}:chat_ids:rota_2`,
+    rota_3: `${environment}:chat_ids:rota_3`,
+    office_hours: `${environment}:chat_ids:office_hours`,
+  };
 
-  const [subscribedChatIds, queueCounts] = await Promise.all([
-    redis.sunion(...subscriptionKeys),
-    getWeatherReportQueueCounts(),
-  ]);
+  const [memberStatsEntries, subscribedChatIds, queueCounts] =
+    await Promise.all([
+      Promise.all(
+        Object.entries(subscriptionKeys).map(
+          async ([key, redisKey]) =>
+            [key, await redis.scard(redisKey)] as const,
+        ),
+      ),
+      redis.sunion(...Object.values(subscriptionKeys)),
+      getWeatherReportQueueCounts(),
+    ]);
+
+  const member_stats = Object.fromEntries(memberStatsEntries);
 
   return res.status(200).json({
     status: 'ok',
@@ -67,6 +76,7 @@ app.get('/health', async (req: any, res: any) => {
     version,
     host: process.env.HOST,
     subscribedChatCount: subscribedChatIds.length,
+    member_stats,
     queue: queueCounts,
     nextUpdate: job.nextInvocation()
       ? job
