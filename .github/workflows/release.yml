@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write  # ← allows semantic-release to push back to main
+
 jobs:
   release:
     runs-on: ubuntu-latest
