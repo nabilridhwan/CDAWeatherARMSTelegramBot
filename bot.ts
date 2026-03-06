@@ -20,10 +20,19 @@ import {
 } from './utils/bot/subscriptions';
 import logger from './utils/infra/logger';
 import { generateVersionInfoMessage } from './utils/infra/version';
+import {
+  enqueueOnDemandWeatherMessage,
+  enqueueScheduledWeatherMessages,
+  initialiseWeatherReportWorker,
+} from './utils/infra/weatherReportQueue';
 import getNextUpdateDateForRota from './utils/schedule/getNextUpdateDateForRota';
 import fetchWeatherReadings from './utils/weather/fetchWeatherReadings';
 
 export const bot = new Telegraf(process.env.BOT_ID!);
+
+if (process.env.NODE_ENV !== 'test') {
+  initialiseWeatherReportWorker(bot);
+}
 
 // ==============================
 // Scheduled job to send weather updates
@@ -50,31 +59,10 @@ export const job = schedule.scheduleJob(rule, async (fireDate) => {
       jobDate: new Date(fireDate),
     });
 
-    const sendingChatPromises = await Promise.allSettled(
-      subscribedChatIds.map((chatId) =>
-        bot.telegram
-          .sendMessage(chatId, escapedReply, {
-            parse_mode: 'MarkdownV2',
-          })
-          .catch((error) => {
-            return bot.telegram.sendMessage(
-              chatId,
-              buildWeatherFetchFailedMessage(error),
-            );
-          }),
-      ),
-    );
-
-    sendingChatPromises.forEach((result) => {
-      if (result.status === 'rejected') {
-        logger.error(`Failed to send message: ${result.reason}`);
-      } else {
-        logger.info(`Weather report sent to chat ID: ${result.value.chat.id}`);
-      }
-    });
+    await enqueueScheduledWeatherMessages(subscribedChatIds, escapedReply);
 
     logger.info(
-      'Weather report sent to all subscribed chat IDs at ' +
+      'Queued weather report sends for all subscribed chat IDs at ' +
         new Date().toLocaleString('en-SG', {
           timeZone: 'Asia/Singapore',
         }),
@@ -188,19 +176,10 @@ bot.command('weather', async (ctx) => {
   const loadingMessage = await ctx.reply(LOADING_MESSAGE);
 
   try {
-    const readings = await fetchWeatherReadings();
-    const escapedReply = buildEscapedWeatherReply(readings);
-
-    await ctx.telegram.editMessageText(
-      ctx.chat.id,
-      loadingMessage.message_id,
-      undefined,
-      escapedReply,
-      { parse_mode: 'MarkdownV2' },
-    );
+    await enqueueOnDemandWeatherMessage(ctx.chat.id, loadingMessage.message_id);
 
     logger.info(
-      'Weather data sent to user: ' +
+      'Queued on-demand weather data for user: ' +
         ctx.from.username +
         ' (ID: ' +
         ctx.from.id +
@@ -208,7 +187,7 @@ bot.command('weather', async (ctx) => {
         ctx.chat.id,
     );
   } catch (error) {
-    logger.error('Error fetching weather data:', error);
+    logger.error('Error queueing on-demand weather data:', error);
     await ctx.telegram.editMessageText(
       ctx.chat.id,
       loadingMessage.message_id,

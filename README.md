@@ -12,6 +12,7 @@ A Telegram bot that automates ARMS weather report checks for personnel at **Civi
 - **Rota-based subscription** — Subscribe to a specific 3-day rota cycle so you only receive updates on your duty days.
 - **Heat stress emoji indicators** — At-a-glance WBGT status: 🟢 Low, 🟡 Moderate, 🔴 High/Very High, ⚪ Unknown.
 - **Redis-backed subscriptions** — Chat subscriptions persist across restarts using Redis sets.
+- **BullMQ-based message queue** — Scheduled and on-demand weather deliveries are queued and processed by a worker.
 - **Secure webhook** — Telegram webhook is protected by a runtime-generated secret token validated on every request.
 - **Health and log endpoints** — Operational visibility via `/health` and `/logs` HTTP endpoints.
 - **Graceful shutdown** — Handles `SIGINT` and `SIGTERM` cleanly; scheduler is cancelled before process exit.
@@ -64,7 +65,7 @@ Scheduled messages additionally include the current job date and the timestamp o
 3. Scheduled job fires on cron rule: weekdays at 09:50, 11:50, 13:50, 15:50 (Asia/Singapore).
 4. Bot queries Redis for all applicable subscribers (office hours + rota match).
 5. Weather data is fetched in parallel for CDA and HTTC from data.gov.sg APIs.
-6. Message is MarkdownV2-formatted and fanned out to all subscribed chats.
+6. Message payloads are enqueued in BullMQ and processed by a worker for Telegram delivery.
 
 ### Data sources
 
@@ -95,6 +96,7 @@ The nearest weather station to each target location is resolved using the Havers
 - **HTTP server**: Express 5.1
 - **Scheduling**: node-schedule 2.1
 - **Persistence**: Redis via ioredis 5.6
+- **Queueing**: BullMQ 5.x (backed by Redis)
 - **Weather API**: axios + data.gov.sg open APIs
 - **Distance calculation**: haversine-distance 1.2
 - **Logging**: Winston 3.17

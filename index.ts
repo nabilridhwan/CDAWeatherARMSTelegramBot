@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { bot, job } from './bot';
 import logger from './utils/infra/logger';
 import redis from './utils/infra/redis';
+import { closeWeatherReportQueue } from './utils/infra/weatherReportQueue';
 import './utils/security/generateSecretToken';
 
 configDotenv();
@@ -62,30 +63,49 @@ app.listen(process.env.PORT || 8080, () => {
 });
 
 // Enable graceful stop
-process.once('SIGINT', () => {
-  logger.info('Bot stopped gracefully.');
+let isShuttingDown = false;
+
+async function shutdown(signal: 'SIGINT' | 'SIGTERM', exitCode?: number) {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
+  logger.info(`Bot stopping gracefully on ${signal}.`);
+
   job.cancel();
-  bot.stop('SIGINT');
+  bot.stop(signal);
+
+  try {
+    await closeWeatherReportQueue();
+    await redis.quit();
+  } catch (error) {
+    logger.error('Error while closing infra during shutdown:', error);
+  }
+
+  if (typeof exitCode === 'number') {
+    process.exit(exitCode);
+  }
+}
+
+process.once('SIGINT', () => {
+  void shutdown('SIGINT');
 });
 
 process.once('SIGTERM', () => {
-  logger.info('Bot stopped gracefully.');
-  job.cancel();
-  bot.stop('SIGTERM');
+  void shutdown('SIGTERM');
 });
 
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught Exception:', err);
-  job.cancel();
+  void shutdown('SIGTERM', 1);
   // Log the error, perform cleanup, and potentially restart the application.
   // It's crucial to exit the process after handling uncaught exceptions.
-  process.exit(1); // Exit with a non-zero code to indicate an error.
 });
 
 process.on('unhandledRejection', (err) => {
   logger.error('Unhandled Rejection:', err);
-  job.cancel();
+  void shutdown('SIGTERM', 1);
   // Log the error, perform cleanup, and potentially restart the application.
   // It's crucial to exit the process after handling unhandled rejections.
-  process.exit(1); // Exit with a non-zero code to indicate an error.
 });

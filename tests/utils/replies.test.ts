@@ -54,7 +54,7 @@ describe('replies', () => {
     );
 
     expect(message).toContain('Job date:');
-    expect(message).toContain('Next Update:');
+    expect(message).toContain('Next update:');
   });
 
   it('escapes markdown v2 special characters used by the bot', () => {
