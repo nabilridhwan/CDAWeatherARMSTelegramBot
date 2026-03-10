@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Weather } from '../../api/weather.api';
 
 vi.mock('axios', () => ({
   default: {
@@ -253,5 +254,24 @@ describe('weather api', () => {
 
     expect(reading.value).toBe(-1);
     expect(reading.dateTime).toBe('2026-03-02T10:00:00+08:00');
+  });
+});
+
+describe('Heat Stress Parser', () => {
+  it('returns green for low heat stress', () => {
+    expect(Weather.Parser.parseWBGTHeatStress('Low')).toBe('🟢');
+  });
+
+  it('returns yellow for moderate heat stress', () => {
+    expect(Weather.Parser.parseWBGTHeatStress('Moderate')).toBe('🟡');
+  });
+
+  it('returns red for high heat stress variants', () => {
+    expect(Weather.Parser.parseWBGTHeatStress('High')).toBe('🔴');
+    expect(Weather.Parser.parseWBGTHeatStress('Very High')).toBe('🔴');
+  });
+
+  it('returns white for unknown values', () => {
+    expect(Weather.Parser.parseWBGTHeatStress('Unknown')).toBe('⚪');
   });
 });

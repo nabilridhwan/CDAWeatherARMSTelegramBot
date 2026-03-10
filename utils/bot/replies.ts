@@ -1,7 +1,6 @@
 import { Weather } from '../../api/weather.api';
 import { job } from '../../bot';
 import { Rota } from '../schedule/rota';
-import getWBGTEmoji from '../weather/getWBGTEmoji';
 
 function formatSingaporeDate(date: Date | string) {
   return new Date(date).toLocaleString('en-SG', { timeZone: 'Asia/Singapore' });
@@ -177,14 +176,14 @@ export function buildEscapedWeatherReply(
       heatStress: readings.cdaWBGT.heatStress,
       wbgt: readings.cdaWBGT.wbgt,
       airTemp: readings.cdaAirTemp.value,
-      emoji: getWBGTEmoji(readings.cdaWBGT.heatStress),
+      emoji: Weather.Parser.parseWBGTHeatStress(readings.cdaWBGT.heatStress),
       dateTime: readings.cdaWBGT.dateTime,
     },
     {
       heatStress: readings.httcWBGT.heatStress,
       wbgt: readings.httcWBGT.wbgt,
       airTemp: readings.httcAirTemp.value,
-      emoji: getWBGTEmoji(readings.httcWBGT.heatStress),
+      emoji: Weather.Parser.parseWBGTHeatStress(readings.httcWBGT.heatStress),
       dateTime: readings.httcWBGT.dateTime,
     },
     options,

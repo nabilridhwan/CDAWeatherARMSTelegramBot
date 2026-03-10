@@ -56,6 +56,24 @@ export namespace Weather {
         longitude: parseFloat(location.longitude),
       };
     }
+
+    /**
+     * Get the WBGT emoji based on the heat stress level.
+     * @param heatStress
+     */
+    export function parseWBGTHeatStress(heatStress: string): string {
+      const heatStressLower = heatStress.toLowerCase();
+
+      if (heatStressLower === 'low') {
+        return '🟢'; // Green for low heat stress
+      } else if (heatStressLower === 'moderate') {
+        return '🟡'; // Yellow for moderate heat stress
+      } else if (heatStressLower.includes('hi')) {
+        return '🔴'; // Red for very high heat stress
+      } else {
+        return '⚪'; // White for unknown or other cases
+      }
+    }
   }
 
   export namespace Distance {
