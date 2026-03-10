@@ -1,12 +1,9 @@
-import express, {
-  type NextFunction,
-  type Request,
-  type Response,
-} from 'express';
+import express, { type Request, type Response } from 'express';
 import helmet from 'helmet';
 import { readFile } from 'node:fs/promises';
 import { Redis } from './api/redis.api';
 import { startBot } from './bot';
+import { verifyTelegramSecretToken } from './middleware/verifyTelegramSecretToken';
 import { version } from './package.json';
 import { WeatherReportSender } from './utils/bot/weatherReportSender';
 import { env } from './utils/infra/env';
@@ -23,23 +20,6 @@ bot.telegram.setWebhook(`${env.HOST}/telegram-webhook`, {
 });
 
 app.use(helmet());
-
-function verifyTelegramSecretToken(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
-  const token = req.get('X-Telegram-Bot-Api-Secret-Token');
-
-  if (token !== env.SECRET_TOKEN) {
-    logger.error('Unauthorized access attempt detected from IP:', req.ip);
-    res.sendStatus(403);
-    return;
-  }
-
-  next();
-}
-
 app.use('/telegram-webhook', verifyTelegramSecretToken);
 app.use(bot.webhookCallback('/telegram-webhook'));
 

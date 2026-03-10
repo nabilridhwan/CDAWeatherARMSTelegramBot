@@ -17,11 +17,6 @@ import { env } from './utils/infra/env';
 import logger from './utils/infra/logger';
 import { Rota } from './utils/schedule/rota';
 
-// Design patterns used in this module:
-// 1) Factory Method / Factory Function: createBot() and createJob() construct runtime objects on demand.
-// 2) Composition Root (Explicit Initialization): startBot() wires dependencies in one place at app startup.
-// 3) Dependency Injection: registerHandlers() receives bot and job instead of reading hidden globals.
-// This design prevents import-time side effects and makes testing/startup flow predictable.
 export type BotRuntime = {
   bot: Telegraf;
   job: schedule.Job;
@@ -36,7 +31,7 @@ export function createBot(): Telegraf {
 // Injecting bot/job here keeps handler setup explicit and decoupled from module import.
 function registerHandlers(bot: Telegraf, job: schedule.Job) {
   // ==============================
-  // Bot command and action handlers
+  // #region Bot command and action handlers
   // ==============================
 
   bot.start(async (ctx) => {
@@ -81,7 +76,7 @@ function registerHandlers(bot: Telegraf, job: schedule.Job) {
   });
 
   // ==============================
-  // Callback query handlers for setting rota subscriptions
+  // #region Callback query handlers for setting rota subscriptions
   // ==============================
   bot.action('set_rota_1', async (ctx) => {
     await Redis.assignRota(1, ctx);
@@ -182,7 +177,7 @@ function registerHandlers(bot: Telegraf, job: schedule.Job) {
 }
 
 // ==============================
-// Scheduled job to send weather updates
+// #region Scheduled job to send weather updates
 // ==============================
 // Creates the scheduler job lazily so importing this module does not start background work.
 function createJob(bot: Telegraf): schedule.Job {
