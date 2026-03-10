@@ -16,7 +16,7 @@ export namespace Redis {
 
   let redisClient: RedisClient | null = null;
 
-  function getRedisClient(): RedisClient {
+  export function getRedisClient(): RedisClient {
     if (!redisClient) {
       redisClient = new RedisClient(redisConnectionOptions);
     }

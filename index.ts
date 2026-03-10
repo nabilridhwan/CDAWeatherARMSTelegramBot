@@ -2,13 +2,14 @@ import { configDotenv } from 'dotenv';
 import express, { type Request, type Response } from 'express';
 import helmet from 'helmet';
 import { readFile } from 'node:fs/promises';
+import { Redis } from './api/redis.api';
 import { bot, job } from './bot';
 import { version } from './package.json';
 import logger from './utils/infra/logger';
-import redis from './utils/infra/redis';
-import './utils/security/generateSecretToken';
+import { ensureSecretToken } from './utils/security/generateSecretToken';
 
 configDotenv();
+ensureSecretToken();
 
 const app = express();
 
@@ -55,10 +56,11 @@ app.get('/health', async (req: any, res: any) => {
   const [memberStatsEntries, subscribedChatIds] = await Promise.all([
     Promise.all(
       Object.entries(subscriptionKeys).map(
-        async ([key, redisKey]) => [key, await redis.scard(redisKey)] as const,
+        async ([key, redisKey]) =>
+          [key, await Redis.getRedisClient().scard(redisKey)] as const,
       ),
     ),
-    redis.sunion(...Object.values(subscriptionKeys)),
+    Redis.getRedisClient().sunion(...Object.values(subscriptionKeys)),
   ]);
 
   const member_stats = Object.fromEntries(memberStatsEntries);
@@ -98,7 +100,7 @@ async function shutdown(signal: 'SIGINT' | 'SIGTERM', exitCode?: number) {
   bot.stop(signal);
 
   try {
-    await redis.quit();
+    await Redis.getRedisClient().quit();
   } catch (error) {
     logger.error('Error while closing infra during shutdown:', error);
   }
