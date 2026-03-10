@@ -1,3 +1,4 @@
+import PQueue from 'p-queue';
 import { Context, Telegraf } from 'telegraf';
 
 import { Weather } from '../../api/weather.api';
@@ -8,6 +9,139 @@ import {
 } from './replies';
 
 export namespace WeatherReportSender {
+  const SEND_QUEUE_CONCURRENCY = 5;
+  const SEND_QUEUE_INTERVAL_CAP = 20;
+  const SEND_QUEUE_INTERVAL_MS = 1_000;
+  const MAX_SEND_ATTEMPTS = 3;
+  const RETRY_BASE_DELAY_MS = 300;
+
+  // Shared queue to smooth outbound Telegram traffic across scheduled and on-demand sends.
+  const sendQueue = new PQueue({
+    concurrency: SEND_QUEUE_CONCURRENCY,
+    intervalCap: SEND_QUEUE_INTERVAL_CAP,
+    interval: SEND_QUEUE_INTERVAL_MS,
+    carryoverConcurrencyCount: true,
+  });
+
+  type TelegramError = {
+    response?: {
+      error_code?: number;
+      parameters?: {
+        retry_after?: number;
+      };
+    };
+    code?: string;
+    message?: string;
+  };
+
+  function asTelegramError(error: unknown): TelegramError {
+    if (typeof error === 'object' && error !== null) {
+      return error as TelegramError;
+    }
+
+    return {};
+  }
+
+  function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function isRetryableTelegramError(error: unknown): boolean {
+    const normalized = asTelegramError(error);
+    const errorCode = normalized.response?.error_code;
+
+    if (errorCode === 429) {
+      return true;
+    }
+
+    if (typeof errorCode === 'number' && errorCode >= 500) {
+      return true;
+    }
+
+    const networkErrorCodes = new Set([
+      'ECONNABORTED',
+      'ECONNRESET',
+      'ETIMEDOUT',
+      'EAI_AGAIN',
+      'ENOTFOUND',
+    ]);
+
+    if (normalized.code && networkErrorCodes.has(normalized.code)) {
+      return true;
+    }
+
+    return errorCode == null;
+  }
+
+  function getRetryDelayMs(error: unknown, attempt: number): number {
+    const normalized = asTelegramError(error);
+    const retryAfter = normalized.response?.parameters?.retry_after;
+
+    if (typeof retryAfter === 'number' && retryAfter > 0) {
+      return retryAfter * 1_000;
+    }
+
+    const jitter = Math.floor(Math.random() * 100);
+    return RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1) + jitter;
+  }
+
+  async function sendOrEditWeatherReport(
+    bot: Telegraf<Context>,
+    chatId: number,
+    escapedReply: string,
+    opts: Parameters<typeof buildEscapedWeatherReply>[1] & {
+      editMessageId?: number;
+    },
+  ) {
+    if (opts.editMessageId != null) {
+      await bot.telegram.editMessageText(
+        chatId,
+        opts.editMessageId,
+        undefined,
+        escapedReply,
+        {
+          parse_mode: 'MarkdownV2',
+        },
+      );
+      logger.info(`Weather report edited for chat ID: ${chatId}`);
+      return;
+    }
+
+    await bot.telegram.sendMessage(chatId, escapedReply, {
+      parse_mode: 'MarkdownV2',
+    });
+    logger.info(`Weather report sent to chat ID: ${chatId}`);
+  }
+
+  async function sendWithRetry(
+    bot: Telegraf<Context>,
+    chatId: number,
+    escapedReply: string,
+    opts: Parameters<typeof buildEscapedWeatherReply>[1] & {
+      editMessageId?: number;
+    },
+  ) {
+    for (let attempt = 1; attempt <= MAX_SEND_ATTEMPTS; attempt++) {
+      try {
+        await sendOrEditWeatherReport(bot, chatId, escapedReply, opts);
+        return;
+      } catch (error) {
+        const shouldRetry =
+          attempt < MAX_SEND_ATTEMPTS && isRetryableTelegramError(error);
+
+        if (!shouldRetry) {
+          throw error;
+        }
+
+        const delayMs = getRetryDelayMs(error, attempt);
+        logger.warn(
+          `Retrying weather send for chat ID ${chatId} (attempt ${attempt + 1}/${MAX_SEND_ATTEMPTS}) in ${delayMs}ms.`,
+        );
+        await sleep(delayMs);
+      }
+    }
+  }
+
   async function notifyChatAboutError(
     bot: Telegraf<Context>,
     chatId: number,
@@ -61,42 +195,25 @@ export namespace WeatherReportSender {
     // If opts.editMessageId is provided, we will attempt to edit the existing message instead of sending a new one. This is used for on-demand weather updates to replace the loading message with the weather report.
 
     await Promise.all(
-      chatIds.map(async (chatId) => {
-        try {
-          if (opts.editMessageId != null) {
-            await bot.telegram.editMessageText(
-              chatId,
-              opts.editMessageId,
-              undefined,
-              escapedReply,
-              {
-                parse_mode: 'MarkdownV2',
-              },
+      chatIds.map((chatId) =>
+        sendQueue.add(async () => {
+          try {
+            await sendWithRetry(bot, chatId, escapedReply, opts);
+          } catch (error) {
+            logger.error(
+              `Failed to send weather report to chat ID ${chatId}:`,
+              error,
             );
 
-            logger.info(`Weather report edited for chat ID: ${chatId}`);
-            return;
+            await notifyChatAboutError(
+              bot,
+              chatId,
+              error,
+              'weather report send/edit failure',
+            );
           }
-
-          await bot.telegram.sendMessage(chatId, escapedReply, {
-            parse_mode: 'MarkdownV2',
-          });
-
-          logger.info(`Weather report sent to chat ID: ${chatId}`);
-        } catch (error) {
-          logger.error(
-            `Failed to send weather report to chat ID ${chatId}:`,
-            error,
-          );
-
-          await notifyChatAboutError(
-            bot,
-            chatId,
-            error,
-            'weather report send/edit failure',
-          );
-        }
-      }),
+        }),
+      ),
     );
   }
 
