@@ -12,6 +12,7 @@ import {
 } from './utils/bot/replies';
 import { rule } from './utils/bot/rule';
 import { WeatherReportSender } from './utils/bot/weatherReportSender';
+import { env } from './utils/infra/env';
 import logger from './utils/infra/logger';
 import { generateVersionInfoMessage } from './utils/infra/version';
 import { Rota } from './utils/schedule/rota';
@@ -28,7 +29,7 @@ export type BotRuntime = {
 
 // Creates the Telegraf instance only when startup calls it.
 export function createBot(): Telegraf {
-  return new Telegraf(process.env.BOT_ID!);
+  return new Telegraf(env.BOT_ID);
 }
 
 // Registers all bot commands/actions against provided runtime instances.

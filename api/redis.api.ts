@@ -1,15 +1,13 @@
-import { configDotenv } from 'dotenv';
 import RedisClient from 'ioredis';
+import { env } from '../utils/infra/env';
 import logger from '../utils/infra/logger';
 import { Rota } from '../utils/schedule/rota';
 
-configDotenv();
-
 export namespace Redis {
   export const redisConnectionOptions = {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379', 10),
-    password: process.env.REDIS_PASSWORD || undefined,
+    host: env.REDIS_HOST,
+    port: env.REDIS_PORT,
+    password: env.REDIS_PASSWORD,
     family: 6,
     maxRetriesPerRequest: null,
   };

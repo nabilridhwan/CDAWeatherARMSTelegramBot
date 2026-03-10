@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { configDotenv } from 'dotenv';
 import haversine from 'haversine-distance';
+import { env } from '../utils/infra/env';
 import logger from '../utils/infra/logger';
 import type {
   AirTempAPIResponse,
@@ -15,20 +15,19 @@ import type {
   WbgtStation,
 } from './types/weather';
 
-configDotenv();
-
 export namespace Weather {
   const WBGT_API_URL =
     'https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt';
   const AIR_TEMP_API_URL =
     'https://api-open.data.gov.sg/v2/real-time/api/air-temperature';
-  const DATA_GOV_API_KEY = process.env.DATA_GOV_API_KEY!;
 
-  const dataGovRequestConfig = {
-    headers: {
-      'x-api-key': DATA_GOV_API_KEY,
-    },
-  };
+  function dataGovRequestConfig() {
+    return {
+      headers: {
+        'x-api-key': env.DATA_GOV_API_KEY,
+      },
+    };
+  }
 
   export namespace Types {
     export type WeatherReadings = {
@@ -183,7 +182,7 @@ export namespace Weather {
       try {
         const response = await axios.get<BaseResponse<WBGTAPIResponse>>(
           WBGT_API_URL,
-          dataGovRequestConfig,
+          dataGovRequestConfig(),
         );
         return response.data;
       } catch (error) {
@@ -199,7 +198,7 @@ export namespace Weather {
       try {
         const response = await axios.get<BaseResponse<AirTempAPIResponse>>(
           AIR_TEMP_API_URL,
-          dataGovRequestConfig,
+          dataGovRequestConfig(),
         );
         return response.data;
       } catch (error) {

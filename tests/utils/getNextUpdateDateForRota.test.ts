@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { rule } from '../../utils/bot/rule';
 import { Rota } from '../../utils/schedule/rota';
 
-vi.mock('../../bot', () => ({
+vi.mock('../../utils/bot/rule', () => ({
   rule: {
     nextInvocationDate: vi.fn(),
   },
