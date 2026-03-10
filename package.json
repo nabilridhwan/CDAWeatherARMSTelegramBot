@@ -1,7 +1,7 @@
 {
   "name": "cda_weather_arms_bot",
   "description": "Get WBGT and heat stress updates for CDA and HTTC, 10 minutes before each ARMS Weather Report deadline. No more checking the myENV app every day!",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "main": "index.ts",
   "license": "MIT",
   "author": {
@@ -14,13 +14,10 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@semantic-release/git": "^10.0.1",
-    "@semantic-release/npm": "^12.0.2",
     "@types/express": "^5.0.3",
     "@types/node": "^24.0.10",
     "@types/node-schedule": "^2.1.7",
     "prettier": "3.6.2",
-    "semantic-release": "^24.2.9",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"

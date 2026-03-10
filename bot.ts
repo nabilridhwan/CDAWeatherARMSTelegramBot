@@ -14,7 +14,6 @@ import { rule } from './utils/bot/rule';
 import { WeatherReportSender } from './utils/bot/weatherReportSender';
 import { env } from './utils/infra/env';
 import logger from './utils/infra/logger';
-import { generateVersionInfoMessage } from './utils/infra/version';
 import { Rota } from './utils/schedule/rota';
 
 // Design patterns used in this module:
@@ -170,7 +169,7 @@ function registerHandlers(bot: Telegraf, job: schedule.Job) {
 
     ctx.telegram.sendMessage(
       ctx.chat.id,
-      buildSettingsMessages(rotaNumber) + '\n\n' + generateVersionInfoMessage(),
+      buildSettingsMessages(rotaNumber),
       Markup.inlineKeyboard([
         [
           Markup.button.callback('Rota 1', 'set_rota_1'),

@@ -21,6 +21,7 @@ It is not affiliated with, endorsed by, or representing:
 - Data source: data.gov.sg weather APIs (WBGT + air temperature)
 - Data store: Redis (via ioredis)
 - Logging: Winston
+- Runtime env validation: `@t3-oss/env-core` + `zod`
 - Testing: Vitest
 - Container: Docker
 - Current deployment config included: Fly.io (`fly.toml`)
@@ -48,7 +49,7 @@ Rota logic lives in `utils/schedule/rota.ts`.
 	- Plus subscribers of the computed rota for that run date
 - Subscriber IDs are de-duplicated before sending
 
-Scheduling rule lives in `bot.ts`:
+Scheduling rule lives in `utils/bot/rule.ts`:
 
 - Days: Monday to Friday
 - Times: `09:50`, `11:50`, `13:50`, `15:50`
@@ -62,51 +63,56 @@ Scheduling rule lives in `bot.ts`:
 - `/stop`: unsubscribes from all schedules
 - `/help`: command help summary
 
+## Design Patterns Used
+
+- Singleton (lazy initialization): `Redis.getRedisClient()` in `api/redis.api.ts` creates one shared Redis client on first use and reuses it afterward.
+- Factory functions: `createBot()` and `createJob()` in `bot.ts` build runtime instances when startup runs, instead of creating them at import time.
+- Composition root: `startBot()` in `bot.ts` wires bot + scheduler + handlers in one startup location.
+- Dependency injection (explicit runtime wiring): handlers are registered via `registerHandlers(bot, job)` so behavior depends on passed instances, not hidden module globals.
+- Module namespace organization: namespaced modules (`Weather`, `Redis`, `Rota`, `WeatherReportSender`) keep related functions and types grouped by bounded context.
+- Defensive error boundary pattern: weather send path catches fetch/send failures and notifies chats with a fallback error message instead of failing silently.
+
 ## Project Structure
 
 ```text
-.
+├── Dockerfile
+├── README.md
 ├── api/
 │   ├── redis.api.ts
-│   ├── weather.ts
+│   ├── weather.api.ts
 │   └── types/
 │       └── weather.ts
+├── bot.ts
 ├── docs/
-├── logs/
+│   ├── weather-update.png
+│   ├── weather.png
+│   └── welcome.png
+├── fly.toml
+├── index.ts
+├── package-lock.json
+├── package.json
 ├── tests/
 │   ├── api/
 │   │   └── weather.test.ts
 │   └── utils/
 │       ├── getNextUpdateDateForRota.test.ts
 │       ├── getRotaNumber.test.ts
-│       ├── getWBGTEmoji.test.ts
-│       ├── replies.test.ts
-│       └── version.test.ts
+│       └── replies.test.ts
+├── tsconfig.json
 ├── utils/
 │   ├── bot/
 │   │   ├── replies.ts
-│   │   └── subscriptions.ts
-│   ├── data/
-│   │   └── weatherCache.ts
-│   ├── infra/
-│   │   ├── logger.ts
-│   │   ├── redis.ts
-│   │   ├── version.ts
+│   │   ├── rule.ts
 │   │   └── weatherReportSender.ts
+│       └── replies.test.ts
+│   ├── infra/
+│   │   ├── env.ts
+│   │   └── logger.ts
 │   ├── schedule/
 │   │   └── rota.ts
 │   ├── security/
 │   │   └── generateSecretToken.ts
-│   └── weather/
-│       ├── fetchWeatherReadings.ts
-│       ├── getWBGTEmoji.ts
-│       └── locations.ts
-├── bot.ts
-├── index.ts
-├── Dockerfile
-├── fly.toml
-├── package.json
-└── tsconfig.json
+└── yarn.lock
 ```
 
 ## Where To Edit What
@@ -114,25 +120,27 @@ Scheduling rule lives in `bot.ts`:
 If you want to change a specific behavior, start here:
 
 - Command text, message formatting, and help copy:
-	- `utils/bot/replies.ts`
+  - `utils/bot/replies.ts`
 - Command handlers and schedule trigger timing:
-	- `bot.ts`
+  - `bot.ts`
+- Cron schedule rule only:
+  - `utils/bot/rule.ts`
 - Rota cycle and next-update computation:
-	- `utils/schedule/rota.ts`
+  - `utils/schedule/rota.ts`
 - Subscription persistence and Redis set logic:
-	- `api/redis.api.ts`
-- Redis connection settings:
-	- `utils/infra/redis.ts`
+  - `api/redis.api.ts`
+- Redis connection settings and singleton behavior:
+  - `api/redis.api.ts`
+- Environment schema and required env vars:
+  - `utils/infra/env.ts`
 - Weather API fetch/parsing and nearest-station logic:
-	- `api/weather.ts`
-	- `utils/weather/fetchWeatherReadings.ts`
-	- `utils/weather/locations.ts`
+  - `api/weather.api.ts`
 - Sending/editing weather reports and send error handling:
-	- `utils/infra/weatherReportSender.ts`
+  - `utils/bot/weatherReportSender.ts`
 - HTTP endpoints (`/health`, `/logs`, webhook wiring):
-	- `index.ts`
+  - `index.ts`
 - Tests:
-	- `tests/`
+  - `tests/`
 
 ## Local Development
 
@@ -150,7 +158,6 @@ DATA_GOV_API_KEY=
 REDIS_HOST=
 REDIS_PORT=
 REDIS_PASSWORD=
-REDIS_USERNAME=
 HOST=http://localhost:8080
 PORT=8080
 NODE_ENV=development
@@ -177,6 +184,11 @@ npm test
 - Redis service (self-hosted or managed)
 - A public HTTPS host for your app (Telegram webhook target)
 - data.gov.sg API key
+
+For Fly.io specifically, you need:
+
+- Fly.io account and CLI
+- One Fly app instance with HTTPS endpoint
 
 ### SaaS/services not strictly required
 
@@ -216,9 +228,9 @@ npm run build
 ```
 
 5. Open a PR with:
-	 - clear problem statement
-	 - summary of behavior changes
-	 - test coverage notes
+- clear problem statement
+- summary of behavior changes
+- test coverage notes
 
 ## Notes
 
