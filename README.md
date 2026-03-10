@@ -1,10 +1,22 @@
 # CDA Weather ARMS Bot
 
-Telegram bot that sends scheduled and on-demand weather updates (WBGT + air temperature) for CDA and HTTC.
+Telegram bot that sends scheduled and on-demand weather updates for CDA and HTTC so ARMS weather reporting is faster and does not require manually checking myENV each time.
+
+If you want to start using the bot as an end user, use the GitHub guide:
+
+- [Getting Started (User Guide)](https://github.com/nabilridhwan/CDAWeatherARMSTelegramBot/wiki/Getting-Started-(User-Guide))
+
+## User Guide And Screenshots
+
+For setup and usage, start with the [Getting Started (User Guide)](https://github.com/nabilridhwan/CDAWeatherARMSTelegramBot/wiki/Getting-Started-(User-Guide)).
+
+| Welcome | `/weather` | Scheduled update |
+| --- | --- | --- |
+| ![Welcome screen](docs/welcome.png) | ![Weather command example](docs/weather.png) | ![Scheduled weather update example](docs/weather-update.png) |
 
 ## Disclaimer
 
-This project is out of pure personal interest.
+This project is built out of personal interest only.
 
 It has no affiliation with, and is not endorsed by:
 
@@ -12,217 +24,246 @@ It has no affiliation with, and is not endorsed by:
 - National Environment Agency (NEA)
 - Singapore Civil Defence Force (SCDF)
 
+## Purpose
+
+The bot exists to do one narrow job reliably:
+
+- fetch live WBGT and air temperature data for CDA and HTTC
+- send scheduled Telegram updates before ARMS reporting deadlines
+- let users subscribe by rota or office-hours schedule
+- let users request an on-demand weather snapshot with `/weather`
+
+Operationally, it also exposes:
+
+- `POST /telegram-webhook`
+- `GET /health`
+- `GET /logs`
+
 ## Tech Stack
 
-- Language/runtime: TypeScript, Node.js
-- Bot framework: Telegraf
-- HTTP server: Express + Helmet
-- Scheduler: node-schedule
-- Data source: data.gov.sg real-time APIs (WBGT, air temperature)
-- Storage: Redis via ioredis
-- Configuration validation: `@t3-oss/env-core` + `zod`
-- Logging: Winston
-- Reliability helpers: axios-retry, p-queue
-- Testing: Vitest
-- Containerization: Docker
-- Deployment config included: Fly.io (`fly.toml`)
+- **Language**: TypeScript
+- **Runtime**: Node.js
+- **Telegram bot framework**: Telegraf
+- **HTTP server**: Express
+- **Scheduler**: node-schedule
+- **Persistence**: Redis via `ioredis`
+- **Weather data source**: data.gov.sg weather APIs
+- **Environment validation**: `@t3-oss/env-core` + `zod`
+- **Logger**: Winston
+- **API retry handling**: `axios-retry`
+- **Outbound message queue and rate limiting**: `p-queue`
+- **Test framework**: Vitest
+- **Containerization**: Docker
+- **Deployment target config**: Fly.io via `fly.toml`
 
-## What The Bot Does
+## Maintainer Mental Model
 
-- Sends scheduled weather updates every weekday at `09:50`, `11:50`, `13:50`, `15:50` Singapore time.
-- Supports subscription modes: `Rota 1`, `Rota 2`, `Rota 3`, `Office Hours`.
-- Supports command-based interactions: `/start`, `/weather`, `/settings`, `/help`.
-- Uses Telegram webhook security via `X-Telegram-Bot-Api-Secret-Token`.
-- Exposes ops endpoints:
-  - `POST /telegram-webhook`
-  - `GET /health`
-  - `GET /logs`
+The project is intentionally split by responsibility:
 
-## Rota Shift Logic
+- `index.ts` is the process entrypoint and HTTP host.
+- `bot.ts` is the bot composition root and scheduler wiring.
+- `api/` contains integrations with external systems.
+- `utils/bot/` contains Telegram-facing behavior and outbound delivery logic.
+- `utils/schedule/` contains rota and schedule domain logic.
+- `utils/infra/` contains shared environment and logging setup.
+- `utils/security/` contains webhook token generation helpers.
 
-Rota logic is implemented in `utils/schedule/rota.ts`.
+The important runtime flow is:
 
-- Reference date: `2025-10-06T00:00:00+08:00`
-- Reference rota at that date: `Rota 3`
-- Cycle order: `3 -> 2 -> 1 -> 3 -> ...` (daily cycle)
-- For each scheduled run:
-  - include all `office_hours` subscribers
-  - include subscribers of the rota for that run date
-- Recipient chat IDs are de-duplicated before sending.
+1. `index.ts` validates env, ensures a webhook secret exists, starts Express, and starts the bot runtime.
+2. `bot.ts` creates the Telegraf bot, registers handlers, and creates the scheduled job.
+3. When the schedule fires, `bot.ts` acquires a Redis lock so multiple instances do not send duplicate messages.
+4. Recipient chat IDs are resolved from Redis using the run date plus rota logic.
+5. `WeatherReportSender` fetches weather data once, formats one reply, and fan-outs sends through a rate-limited queue.
 
-Schedule timing is defined in `utils/bot/rule.ts`.
+## Important Design Patterns
 
-## Important Files And What They Do
+These are the patterns worth preserving because they shape how the bot stays predictable and maintainable.
 
-- `index.ts`
-  - App entrypoint.
-  - Starts Express server, starts bot runtime, sets Telegram webhook, registers middleware/endpoints, handles graceful shutdown.
-- `bot.ts`
-  - Bot runtime composition root.
-  - Builds Telegraf bot + schedule job (`startBot()`), registers command/action handlers, and triggers scheduled sends.
-- `utils/bot/rule.ts`
-  - Single source of truth for cron-like schedule rules.
-- `utils/schedule/rota.ts`
-  - Rota cycle math and "next update for this rota" calculation.
-- `api/redis.api.ts`
-  - Redis access layer.
-  - Lazy singleton Redis client, subscription set operations, distributed lock acquire/release for scheduled job dedupe.
-- `api/weather.api.ts`
-  - Weather API client and parsing.
-  - Calls data.gov APIs, applies retries/backoff, picks nearest station by coordinates.
-- `utils/bot/weatherReportSender.ts`
-  - Outbound message delivery pipeline.
-  - Rate-limited queue + retry logic for Telegram send/edit operations.
-- `utils/bot/replies.ts`
-  - All user-facing message templates and weather reply formatting/escaping.
-- `utils/infra/env.ts`
-  - Validates and exposes required environment variables.
-- `utils/security/generateSecretToken.ts`
-  - Generates webhook secret token at runtime if one is not provided.
+### 1. Composition root at startup
 
-## Design Patterns Used
+`bot.ts` centralizes runtime construction in `startBot()`.
 
-- Singleton (lazy): `Redis.getRedisClient()` in `api/redis.api.ts` ensures one shared Redis connection instance.
-- Factory functions: `createBot()` and `createJob()` in `bot.ts` create runtime objects only at startup.
-- Composition root: `startBot()` in `bot.ts` wires bot + job + handlers in one place.
-- Dependency injection: `registerHandlers(bot, job)` receives dependencies explicitly instead of relying on hidden globals.
-- Namespace/module grouping: `Weather`, `Redis`, `Rota`, `WeatherReportSender` organize related logic by domain.
-- Resilience patterns:
-  - Retry with exponential backoff + jitter for data.gov requests (`api/weather.api.ts` + `axios-retry`).
-  - Queue-based outbound delivery for Telegram sends (`utils/bot/weatherReportSender.ts` + `p-queue`) to control throughput and reduce burst failures.
-  - Per-chat send retry for transient Telegram failures (rate limits/network/server errors), with bounded attempts and delay logic.
-  - Distributed lock (`api/redis.api.ts`) to avoid duplicate scheduled sends across multiple app instances.
+- `createBot()` builds the Telegraf instance
+- `createJob()` builds the scheduler job
+- `registerHandlers()` wires commands and callback actions
 
-### Queuing And Retries (Detailed)
+Why it matters:
 
-- Outbound queueing
-  - The bot uses a shared `PQueue` in `utils/bot/weatherReportSender.ts`.
-  - Queue settings (`concurrency`, `intervalCap`, `interval`) smooth outbound traffic so scheduled blasts do not flood Telegram.
-  - This is effectively a rate-limiter pattern applied at the message delivery layer.
+- startup side effects stay explicit
+- testing and future refactors are simpler
+- imports do not accidentally start background jobs
 
-- Telegram retry strategy
-  - Each send/edit is wrapped in `sendWithRetry(...)`.
-  - Retries are attempted for transient failures only, such as:
-    - HTTP `429` (rate limit)
-    - Telegram/server `5xx`
-    - transient network errors (`ECONNRESET`, `ETIMEDOUT`, `ENOTFOUND`, etc.)
-  - Delay uses either Telegram `retry_after` (if provided) or exponential backoff with jitter.
-  - Retries are bounded (`MAX_SEND_ATTEMPTS`) to avoid infinite loops.
+### 2. Factory-style runtime creation
 
-- data.gov retry strategy
-  - `api/weather.api.ts` configures `axios-retry` for API reads.
-  - Retries include timeout/connection failures and retryable HTTP statuses (`408`, `429`, `5xx`).
-  - Backoff uses exponential delay with jitter, and honors `retry-after` when available.
+The bot and scheduler are created through functions instead of module-level singletons.
 
-- Why this matters
-  - Prevents message-loss spikes during transient outages.
-  - Reduces webhook/scheduler burst pressure.
-  - Keeps scheduled sends reliable without requiring a separate queue broker.
+Why it matters:
 
-## Where To Edit For Specific Changes
+- startup order is clear
+- runtime objects are easier to replace in tests
+- infra setup is not hidden at import time
 
-- Change bot commands or callback behavior:
-  - `bot.ts`
-- Change schedule times/days:
-  - `utils/bot/rule.ts`
-- Change rota algorithm or anchor date:
-  - `utils/schedule/rota.ts`
-- Change subscription storage logic / Redis keying:
-  - `api/redis.api.ts`
-- Change weather fetch/retry/parsing/nearest-station logic:
-  - `api/weather.api.ts`
-- Change response text and formatting:
-  - `utils/bot/replies.ts`
-- Change weather send retry/queue behavior:
-  - `utils/bot/weatherReportSender.ts`
-- Change webhook security token behavior:
-  - `utils/security/generateSecretToken.ts`
-- Change env schema and required variables:
-  - `utils/infra/env.ts`
-- Change HTTP endpoints (`/health`, `/logs`, webhook middleware):
-  - `index.ts`
+### 3. Lazy singleton for Redis
 
-## Local Development
+`api/redis.api.ts` exposes `getRedisClient()` and initializes Redis once.
 
-1. Install dependencies:
+Why it matters:
 
-```bash
-npm install
-```
+- one shared connection is reused
+- Redis access stays centralized
+- connection setup is consistent across the app
 
-2. Create `.env` with required values:
+### 4. Domain separation by module
 
-```env
-BOT_ID=
-DATA_GOV_API_KEY=
-REDIS_HOST=
-REDIS_PORT=
-REDIS_PASSWORD=
-HOST=http://localhost:8080
-PORT=8080
-NODE_ENV=development
-```
+The codebase separates concerns cleanly:
 
-3. Build and run:
+- weather fetching/parsing in `api/weather.api.ts`
+- subscription persistence in `api/redis.api.ts`
+- message formatting in `utils/bot/replies.ts`
+- send queue and Telegram retry behavior in `utils/bot/weatherReportSender.ts`
+- rota math in `utils/schedule/rota.ts`
 
-```bash
-npm run build
-npm start
-```
+Why it matters:
 
-4. Run tests:
+- you can change one behavior without touching unrelated layers
+- future bugs are easier to localize
+
+### 5. Distributed lock for scheduled sends
+
+Scheduled jobs use a Redis lock keyed by minute slot.
+
+Why it matters:
+
+- prevents duplicate weather blasts when more than one app instance is running
+- keeps horizontal deployment safe
+
+### 6. Queue-based outbound delivery
+
+All Telegram sends go through a shared `PQueue` in `utils/bot/weatherReportSender.ts`.
+
+Why it matters:
+
+- outbound traffic is rate-limited
+- scheduled sends do not burst too hard against Telegram
+- both scheduled and on-demand sends use the same delivery path
+
+### 7. Retry only around transient failures
+
+There are two retry layers:
+
+- data.gov requests retry in `api/weather.api.ts`
+- Telegram send/edit operations retry in `utils/bot/weatherReportSender.ts`
+
+Why it matters:
+
+- transient network and `429`/`5xx` failures are tolerated
+- permanent failures are not retried forever
+- retry rules are centralized instead of scattered through handlers
+
+### 8. Environment validation at process edge
+
+`utils/infra/env.ts` validates env vars at startup.
+
+Why it matters:
+
+- missing configuration fails fast
+- downstream modules can assume typed config exists
+
+## Where To Change What
+
+Use this as the first place to look before editing.
+
+### Bot behavior
+
+- Add or change Telegram commands and callback actions: `bot.ts`
+- Change welcome/help/settings wording: `utils/bot/replies.ts`
+- Change Markdown escaping or weather message layout: `utils/bot/replies.ts`
+
+### Scheduling and rota logic
+
+- Change scheduled send timing or weekdays: `utils/bot/rule.ts`
+- Change rota cycle order, anchor date, or "next update" calculation: `utils/schedule/rota.ts`
+- Change which subscribers receive a scheduled run: `api/redis.api.ts`
+
+### Weather data logic
+
+- Change data source URLs, retry policy, or request timeout: `api/weather.api.ts`
+- Change closest-station selection logic: `api/weather.api.ts`
+- Change CDA/HTTC coordinates or location defaults: `api/weather.api.ts`
+
+### Subscription storage
+
+- Change Redis key structure or environment prefixes: `utils/schedule/rota.ts`
+- Change subscription reads/writes and lock behavior: `api/redis.api.ts`
+
+### Telegram sending reliability
+
+- Change queue concurrency / rate limits: `utils/bot/weatherReportSender.ts`
+- Change Telegram retry conditions or retry backoff: `utils/bot/weatherReportSender.ts`
+- Change how on-demand `/weather` edits the loading message: `utils/bot/weatherReportSender.ts`
+
+### HTTP/server behavior
+
+- Change webhook middleware, `/health`, `/logs`, or shutdown flow: `index.ts`
+- Change webhook secret token generation fallback: `utils/security/generateSecretToken.ts`
+
+### Infra and operations
+
+- Change env schema or required variables: `utils/infra/env.ts`
+- Change logging format or log destinations: `utils/infra/logger.ts`
+- Change deployment container settings: `Dockerfile`
+- Change Fly deployment settings: `fly.toml`
+
+### Tests
+
+- Weather API tests: `tests/api/weather.test.ts`
+- Reply formatting tests: `tests/utils/replies.test.ts`
+- Rota/date logic tests: `tests/utils/getNextUpdateDateForRota.test.ts`, `tests/utils/getRotaNumber.test.ts`
+
+## Current Schedule Model
+
+Schedule definition lives in `utils/bot/rule.ts`.
+
+- weekdays only
+- `09:50`, `11:50`, `13:50`, `15:50`
+- Singapore timezone
+
+Rota logic lives in `utils/schedule/rota.ts`.
+
+- reference date: `2025-10-06T00:00:00+08:00`
+- reference rota on that date: `Rota 3`
+- cycle order: `3 -> 2 -> 1 -> 3 -> ...`
+
+For each scheduled send:
+
+- all `office_hours` subscribers are included
+- the matching rota for that run date is included
+- chat IDs are de-duplicated before sending
+
+## Repository Map
+
+- `index.ts`: app entrypoint, Express server, webhook setup, health/log endpoints, shutdown flow
+- `bot.ts`: bot runtime construction, handlers, scheduled job
+- `api/redis.api.ts`: Redis client access, subscriptions, distributed lock
+- `api/weather.api.ts`: weather fetch, parsing, closest-station logic, retries
+- `utils/bot/replies.ts`: reply templates and weather message formatting
+- `utils/bot/weatherReportSender.ts`: queue-based Telegram delivery and retries
+- `utils/bot/rule.ts`: recurrence rule for scheduled sends
+- `utils/schedule/rota.ts`: rota cycle math and Redis key helpers
+- `utils/infra/env.ts`: env validation
+- `utils/infra/logger.ts`: logger setup
+- `utils/security/generateSecretToken.ts`: webhook secret generation
+
+## Development Notes
+
+If you are changing behavior, run:
 
 ```bash
 npm test
-```
-
-## How To Contribute
-
-1. Create a branch from `main`.
-2. Make focused changes with tests where behavior changes.
-3. Run checks locally:
-
-```bash
-npm test
 npm run build
 ```
 
-4. Open a PR with:
-- problem statement
-- summary of behavior changes
-- tests added/updated
+If you only want to learn how to run or use the bot as an end user, use the GitHub guide:
 
-## Deployment
-
-### SaaS/services required
-
-- Telegram Bot API (bot token via BotFather)
-- Redis instance (managed or self-hosted)
-- Public HTTPS endpoint reachable by Telegram webhook
-- data.gov.sg API key
-
-### SaaS/services not required
-
-- Fly.io is optional (you can deploy anywhere with HTTPS + Node runtime)
-- Docker is optional
-
-### Fly.io deployment (repo has config)
-
-`fly.toml` is included and configured for port `8080` in region `sin`.
-
-High-level steps:
-
-1. Create/provision Redis and collect credentials.
-2. Configure Fly secrets/env vars (`BOT_ID`, `DATA_GOV_API_KEY`, `REDIS_*`, `HOST`, `PORT`, `NODE_ENV`).
-3. Deploy to Fly.io.
-4. Set `HOST` to your public HTTPS app URL.
-5. Verify:
-- `GET /health` returns healthy status.
-- Telegram delivers updates to `POST /telegram-webhook`.
-
-### Generic Docker deployment
-
-```bash
-docker build -t cda-weather-arms-bot .
-docker run --rm -p 8080:8080 --env-file .env cda-weather-arms-bot
-```
+- [Getting Started (User Guide)](https://github.com/nabilridhwan/CDAWeatherARMSTelegramBot/wiki/Getting-Started-(User-Guide))
