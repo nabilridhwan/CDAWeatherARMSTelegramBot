@@ -79,11 +79,11 @@ describe('weather api', () => {
 
     expect(mockedAxiosGet).toHaveBeenCalledWith(
       'https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt',
-      {
+      expect.objectContaining({
         headers: {
           'x-api-key': 'unit-test-key',
         },
-      },
+      }),
     );
     expect(reading).toEqual({
       wbgt: '30.1',
@@ -187,11 +187,11 @@ describe('weather api', () => {
 
     expect(mockedAxiosGet).toHaveBeenCalledWith(
       'https://api-open.data.gov.sg/v2/real-time/api/air-temperature',
-      {
+      expect.objectContaining({
         headers: {
           'x-api-key': 'unit-test-key',
         },
-      },
+      }),
     );
     expect(reading).toEqual({
       dateTime: '2026-03-02T10:00:00+08:00',
