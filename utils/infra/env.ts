@@ -1,41 +1,34 @@
+import { createEnv } from '@t3-oss/env-core';
 import { configDotenv } from 'dotenv';
+import { z } from 'zod';
+import { ensureSecretToken } from '../security/generateSecretToken';
 
 configDotenv();
 
-export const env = {
-  get BOT_ID(): string {
-    return process.env.BOT_ID ?? '';
+export const env = createEnv({
+  server: {
+    BOT_ID: z.string(),
+    DATA_GOV_API_KEY: z.string(),
+    REDIS_HOST: z.string(),
+    REDIS_PORT: z.coerce.number(),
+    REDIS_PASSWORD: z.string(),
+    HOST: z.string(),
+    PORT: z.coerce.number().default(8080),
+    SECRET_TOKEN: z.string().default(ensureSecretToken()),
+    NODE_ENV: z
+      .enum(['development', 'test', 'production'])
+      .default('development'),
   },
-
-  get DATA_GOV_API_KEY(): string {
-    return process.env.DATA_GOV_API_KEY ?? '';
+  runtimeEnvStrict: {
+    BOT_ID: process.env.BOT_ID,
+    DATA_GOV_API_KEY: process.env.DATA_GOV_API_KEY,
+    REDIS_HOST: process.env.REDIS_HOST,
+    REDIS_PORT: process.env.REDIS_PORT,
+    REDIS_PASSWORD: process.env.REDIS_PASSWORD,
+    HOST: process.env.HOST,
+    PORT: process.env.PORT,
+    SECRET_TOKEN: process.env.SECRET_TOKEN,
+    NODE_ENV: process.env.NODE_ENV,
   },
-
-  get REDIS_HOST(): string {
-    return process.env.REDIS_HOST ?? 'localhost';
-  },
-
-  get REDIS_PORT(): number {
-    return parseInt(process.env.REDIS_PORT ?? '6379', 10);
-  },
-
-  get REDIS_PASSWORD(): string | undefined {
-    return process.env.REDIS_PASSWORD || undefined;
-  },
-
-  get HOST(): string {
-    return process.env.HOST ?? 'http://localhost:8080';
-  },
-
-  get PORT(): number {
-    return parseInt(process.env.PORT ?? '8080', 10);
-  },
-
-  get SECRET_TOKEN(): string {
-    return process.env.SECRET_TOKEN ?? '';
-  },
-
-  get NODE_ENV(): string {
-    return process.env.NODE_ENV ?? 'development';
-  },
-};
+  emptyStringAsUndefined: true,
+});
