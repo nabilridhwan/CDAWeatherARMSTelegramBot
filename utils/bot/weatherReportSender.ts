@@ -161,6 +161,33 @@ export namespace WeatherReportSender {
     }
   }
 
+  async function enqueueWeatherSend(
+    bot: Telegraf<Context>,
+    chatId: number,
+    escapedReply: string,
+    opts: Parameters<typeof buildEscapedWeatherReply>[1] & {
+      editMessageId?: number;
+    },
+  ) {
+    await sendQueue.add(async () => {
+      try {
+        await sendWithRetry(bot, chatId, escapedReply, opts);
+      } catch (error) {
+        logger.error(
+          `Failed to send weather report to chat ID ${chatId}:`,
+          error,
+        );
+
+        await notifyChatAboutError(
+          bot,
+          chatId,
+          error,
+          'weather report send/edit failure',
+        );
+      }
+    });
+  }
+
   export async function sendWeatherMessages(
     bot: Telegraf<Context>,
     chatIds: number[],
@@ -185,7 +212,9 @@ export namespace WeatherReportSender {
 
       await Promise.all(
         chatIds.map((chatId) =>
-          notifyChatAboutError(bot, chatId, error, 'weather fetch failure'),
+          sendQueue.add(() =>
+            notifyChatAboutError(bot, chatId, error, 'weather fetch failure'),
+          ),
         ),
       );
 
@@ -196,25 +225,13 @@ export namespace WeatherReportSender {
 
     await Promise.all(
       chatIds.map((chatId) =>
-        sendQueue.add(async () => {
-          try {
-            await sendWithRetry(bot, chatId, escapedReply, opts);
-          } catch (error) {
-            logger.error(
-              `Failed to send weather report to chat ID ${chatId}:`,
-              error,
-            );
-
-            await notifyChatAboutError(
-              bot,
-              chatId,
-              error,
-              'weather report send/edit failure',
-            );
-          }
-        }),
+        enqueueWeatherSend(bot, chatId, escapedReply, opts),
       ),
     );
+  }
+
+  export async function waitForIdle() {
+    await sendQueue.onIdle();
   }
 
   // export async function sendOnDemandWeatherMessage(

@@ -8,6 +8,7 @@ import { readFile } from 'node:fs/promises';
 import { Redis } from './api/redis.api';
 import { startBot } from './bot';
 import { version } from './package.json';
+import { WeatherReportSender } from './utils/bot/weatherReportSender';
 import { env } from './utils/infra/env';
 import logger from './utils/infra/logger';
 import { ensureSecretToken } from './utils/security/generateSecretToken';
@@ -107,6 +108,13 @@ async function shutdown(signal: 'SIGINT' | 'SIGTERM', exitCode?: number) {
   logger.info(`Bot stopping gracefully on ${signal}.`);
 
   job.cancel();
+
+  try {
+    await WeatherReportSender.waitForIdle();
+  } catch (error) {
+    logger.error('Error while waiting for outbound queue to drain:', error);
+  }
+
   bot.stop(signal);
 
   try {
