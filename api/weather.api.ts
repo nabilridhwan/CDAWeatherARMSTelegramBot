@@ -1,4 +1,5 @@
 import axios from 'axios';
+import axiosRetry from 'axios-retry';
 import haversine from 'haversine-distance';
 import { env } from '../utils/infra/env';
 import logger from '../utils/infra/logger';
@@ -34,9 +35,26 @@ export namespace Weather {
     };
   }
 
-  function sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
+  axiosRetry(axios, {
+    retries: DATA_GOV_MAX_RETRIES,
+    retryCondition: (error) => isRetryableWeatherError(error),
+    retryDelay: (retryCount, error) => {
+      const retryAfterHeader = error.response?.headers?.['retry-after'];
+      const retryAfterSeconds = Number(retryAfterHeader);
+
+      if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+        return retryAfterSeconds * 1_000;
+      }
+
+      const jitter = Math.floor(Math.random() * 100);
+      return DATA_GOV_BASE_BACKOFF_MS * Math.pow(2, retryCount - 1) + jitter;
+    },
+    onRetry: (retryCount, error, requestConfig) => {
+      logger.warn(
+        `Retrying data.gov request to ${requestConfig.url ?? 'unknown url'} (attempt ${retryCount}/${DATA_GOV_MAX_RETRIES}) after transient error: ${error.message}`,
+      );
+    },
+  });
 
   function isRetryableWeatherError(error: unknown): boolean {
     if (!axios.isAxiosError(error)) {
@@ -59,35 +77,15 @@ export namespace Weather {
     url: string,
     requestName: 'WBGT' | 'Air Temperature',
   ): Promise<BaseResponse<T>> {
-    let attempt = 0;
-
-    while (true) {
-      try {
-        const response = await axios.get<BaseResponse<T>>(
-          url,
-          dataGovRequestConfig(),
-        );
-        return response.data;
-      } catch (error) {
-        const shouldRetry =
-          attempt < DATA_GOV_MAX_RETRIES && isRetryableWeatherError(error);
-
-        if (!shouldRetry) {
-          logger.error(`Error fetching ${requestName} data:`, error);
-          throw error;
-        }
-
-        attempt += 1;
-        const jitter = Math.floor(Math.random() * 100);
-        const backoffMs =
-          DATA_GOV_BASE_BACKOFF_MS * Math.pow(2, attempt - 1) + jitter;
-
-        logger.warn(
-          `Retrying ${requestName} data request (attempt ${attempt}/${DATA_GOV_MAX_RETRIES}) after ${backoffMs}ms.`,
-        );
-
-        await sleep(backoffMs);
-      }
+    try {
+      const response = await axios.get<BaseResponse<T>>(
+        url,
+        dataGovRequestConfig(),
+      );
+      return response.data;
+    } catch (error) {
+      logger.error(`Error fetching ${requestName} data:`, error);
+      throw error;
     }
   }
 

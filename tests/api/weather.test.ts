@@ -8,6 +8,10 @@ vi.mock('axios', () => ({
   },
 }));
 
+vi.mock('axios-retry', () => ({
+  default: vi.fn(),
+}));
+
 vi.mock('../../utils/infra/logger', () => ({
   default: {
     error: vi.fn(),
