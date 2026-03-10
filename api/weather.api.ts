@@ -16,6 +16,10 @@ import type {
 } from './types/weather';
 
 export namespace Weather {
+  const DATA_GOV_TIMEOUT_MS = 5_000;
+  const DATA_GOV_MAX_RETRIES = 2;
+  const DATA_GOV_BASE_BACKOFF_MS = 300;
+
   const WBGT_API_URL =
     'https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt';
   const AIR_TEMP_API_URL =
@@ -26,7 +30,65 @@ export namespace Weather {
       headers: {
         'x-api-key': env.DATA_GOV_API_KEY,
       },
+      timeout: DATA_GOV_TIMEOUT_MS,
     };
+  }
+
+  function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function isRetryableWeatherError(error: unknown): boolean {
+    if (!axios.isAxiosError(error)) {
+      return false;
+    }
+
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      return true;
+    }
+
+    if (!error.response) {
+      return true;
+    }
+
+    const status = error.response.status;
+    return status === 408 || status === 429 || (status >= 500 && status <= 599);
+  }
+
+  async function requestDataGov<T>(
+    url: string,
+    requestName: 'WBGT' | 'Air Temperature',
+  ): Promise<BaseResponse<T>> {
+    let attempt = 0;
+
+    while (true) {
+      try {
+        const response = await axios.get<BaseResponse<T>>(
+          url,
+          dataGovRequestConfig(),
+        );
+        return response.data;
+      } catch (error) {
+        const shouldRetry =
+          attempt < DATA_GOV_MAX_RETRIES && isRetryableWeatherError(error);
+
+        if (!shouldRetry) {
+          logger.error(`Error fetching ${requestName} data:`, error);
+          throw error;
+        }
+
+        attempt += 1;
+        const jitter = Math.floor(Math.random() * 100);
+        const backoffMs =
+          DATA_GOV_BASE_BACKOFF_MS * Math.pow(2, attempt - 1) + jitter;
+
+        logger.warn(
+          `Retrying ${requestName} data request (attempt ${attempt}/${DATA_GOV_MAX_RETRIES}) after ${backoffMs}ms.`,
+        );
+
+        await sleep(backoffMs);
+      }
+    }
   }
 
   export namespace Types {
@@ -179,32 +241,17 @@ export namespace Weather {
      * Read datetime for the latest WBGT data
      */
     async function getWBGT() {
-      try {
-        const response = await axios.get<BaseResponse<WBGTAPIResponse>>(
-          WBGT_API_URL,
-          dataGovRequestConfig(),
-        );
-        return response.data;
-      } catch (error) {
-        logger.error('Error fetching WBGT data:', error);
-        throw error;
-      }
+      return requestDataGov<WBGTAPIResponse>(WBGT_API_URL, 'WBGT');
     }
 
     /**
      * Read datetime for the latest Air Temperature data
      */
     async function getAirTemp() {
-      try {
-        const response = await axios.get<BaseResponse<AirTempAPIResponse>>(
-          AIR_TEMP_API_URL,
-          dataGovRequestConfig(),
-        );
-        return response.data;
-      } catch (error) {
-        logger.error('Error fetching Air Temperature data:', error);
-        throw error;
-      }
+      return requestDataGov<AirTempAPIResponse>(
+        AIR_TEMP_API_URL,
+        'Air Temperature',
+      );
     }
 
     /**
