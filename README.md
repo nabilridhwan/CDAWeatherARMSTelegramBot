@@ -60,7 +60,6 @@ Scheduling rule lives in `utils/bot/rule.ts`:
 - `/start`: first-time schedule selection, or shows current subscription + next update if already subscribed
 - `/weather`: fetches and returns current weather snapshot immediately
 - `/settings`: shows current subscription + buttons to change schedule/stop
-- `/stop`: unsubscribes from all schedules
 - `/help`: command help summary
 
 ## Design Patterns Used
