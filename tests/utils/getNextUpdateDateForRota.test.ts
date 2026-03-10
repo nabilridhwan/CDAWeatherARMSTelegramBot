@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { rule } from '../../bot';
-import getNextUpdateDateForRota from '../../utils/schedule/getNextUpdateDateForRota';
-import getRotaNumberForDate from '../../utils/schedule/getRotaNumber';
+import { Rota } from '../../utils/schedule/rota';
 
 vi.mock('../../bot', () => ({
   rule: {
@@ -9,13 +8,8 @@ vi.mock('../../bot', () => ({
   },
 }));
 
-vi.mock('../../utils/schedule/getRotaNumber', () => ({
-  default: vi.fn(),
-}));
-
 describe('getNextUpdateDateForRota', () => {
   const mockedNextInvocationDate = vi.mocked(rule.nextInvocationDate);
-  const mockedGetRotaNumberForDate = vi.mocked(getRotaNumberForDate);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -27,11 +21,10 @@ describe('getNextUpdateDateForRota', () => {
 
     mockedNextInvocationDate.mockReturnValueOnce(firstInvocation);
 
-    const result = getNextUpdateDateForRota('office_hours', fromDate);
+    const result = Rota.getNextUpdateDateForRota('office_hours', fromDate);
 
     expect(result).toEqual(firstInvocation);
     expect(mockedNextInvocationDate).toHaveBeenCalledWith(fromDate);
-    expect(mockedGetRotaNumberForDate).not.toHaveBeenCalled();
   });
 
   it('skips non-matching rota and returns first matching invocation', () => {
@@ -43,9 +36,7 @@ describe('getNextUpdateDateForRota', () => {
       .mockReturnValueOnce(firstInvocation)
       .mockReturnValueOnce(secondInvocation);
 
-    mockedGetRotaNumberForDate.mockReturnValueOnce(2).mockReturnValueOnce(3);
-
-    const result = getNextUpdateDateForRota(3, fromDate);
+    const result = Rota.getNextUpdateDateForRota(3, fromDate);
 
     expect(result).toEqual(secondInvocation);
     expect(mockedNextInvocationDate).toHaveBeenNthCalledWith(1, fromDate);
@@ -53,7 +44,6 @@ describe('getNextUpdateDateForRota', () => {
       2,
       new Date(firstInvocation.getTime() + 60_000),
     );
-    expect(mockedGetRotaNumberForDate).toHaveBeenCalledTimes(2);
   });
 
   it('returns null when no next invocation exists', () => {
@@ -61,9 +51,8 @@ describe('getNextUpdateDateForRota', () => {
 
     mockedNextInvocationDate.mockReturnValueOnce(null as never);
 
-    const result = getNextUpdateDateForRota(1, fromDate);
+    const result = Rota.getNextUpdateDateForRota(1, fromDate);
 
     expect(result).toBeNull();
-    expect(mockedGetRotaNumberForDate).not.toHaveBeenCalled();
   });
 });
