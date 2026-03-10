@@ -3,7 +3,7 @@ import express, { type Request, type Response } from 'express';
 import helmet from 'helmet';
 import { readFile } from 'node:fs/promises';
 import { Redis } from './api/redis.api';
-import { bot, job } from './bot';
+import { startBot } from './bot';
 import { version } from './package.json';
 import logger from './utils/infra/logger';
 import { ensureSecretToken } from './utils/security/generateSecretToken';
@@ -12,6 +12,7 @@ configDotenv();
 ensureSecretToken();
 
 const app = express();
+const { bot, job } = startBot();
 
 bot.telegram.setWebhook(
   `${process.env.HOST || 'http://localhost:8080'}/telegram-webhook`,
