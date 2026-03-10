@@ -34,6 +34,13 @@ export namespace Redis {
       throw error;
     }
   }
+  export async function assignRota(rotaNumber: Rota.WorkingSchedule, ctx: any) {
+    try {
+      await Redis.setRotaSubscription(ctx.chat.id, rotaNumber);
+    } catch (err) {
+      logger.error(`Failed to set rota subscription: ${err}`);
+    }
+  }
 
   export async function getSubscribedChatIdsForDate(
     fireDate: Date,
