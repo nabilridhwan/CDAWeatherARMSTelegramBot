@@ -1,8 +1,8 @@
 import schedule from 'node-schedule';
 import { Markup, Telegraf } from 'telegraf';
+import { Redis } from './api/redis.api';
 import {
   buildAlreadySubscribedMessage,
-  buildEscapedWeatherReply,
   buildRotaSetSuccessMessage,
   buildSettingsMessages,
   HELP_MESSAGE,
@@ -10,21 +10,10 @@ import {
   STOP_SUCCESS_MESSAGE,
   WELCOME_SUBSCRIBED_MESSAGE,
 } from './utils/bot/replies';
-import {
-  getChatSubscriptionRota,
-  getSubscribedChatIdsForDate,
-  removeChatFromAllSubscriptions,
-  setRotaSubscription,
-  WorkingSchedule,
-} from './utils/bot/subscriptions';
 import logger from './utils/infra/logger';
 import { generateVersionInfoMessage } from './utils/infra/version';
-import {
-  sendOnDemandWeatherMessage,
-  sendScheduledWeatherMessages,
-} from './utils/infra/weatherReportSender';
-import getNextUpdateDateForRota from './utils/schedule/getNextUpdateDateForRota';
-import fetchWeatherReadings from './utils/weather/fetchWeatherReadings';
+import { WeatherReportSender } from './utils/infra/weatherReportSender';
+import { Rota } from './utils/schedule/rota';
 
 export const bot = new Telegraf(process.env.BOT_ID!);
 
@@ -41,19 +30,20 @@ rule.tz = 'Singapore';
 
 export const job = schedule.scheduleJob(rule, async (fireDate) => {
   try {
-    const subscribedChatIds = await getSubscribedChatIdsForDate(fireDate);
+    const subscribedChatIds = await Redis.getSubscribedChatIdsForDate(fireDate);
 
     if (subscribedChatIds.length === 0) {
       logger.info('No subscribed chat IDs found. Skipping weather report.');
       return;
     }
 
-    const readings = await fetchWeatherReadings();
-    const escapedReply = buildEscapedWeatherReply(readings, {
-      jobDate: new Date(fireDate),
-    });
-
-    await sendScheduledWeatherMessages(bot, subscribedChatIds, escapedReply);
+    await WeatherReportSender.sendWeatherMessages(
+      bot,
+      subscribedChatIds.map((id) => parseInt(id, 10)),
+      {
+        jobDate: new Date(fireDate),
+      },
+    );
 
     logger.info(
       'Sent weather reports to all subscribed chat IDs at ' +
@@ -75,13 +65,14 @@ bot.start(async (ctx) => {
     `Start command called by Chat ID: ${ctx.chat.id}. Next update at ${new Date(job.nextInvocation()).toLocaleString('en-SG', { timeZone: 'Asia/Singapore' })}`,
   );
 
-  const subscriptionRota = await getChatSubscriptionRota(ctx.chat.id);
-  const rotaNumber: WorkingSchedule | null = subscriptionRota;
+  const subscriptionRota = await Redis.getChatSubscriptionRota(ctx.chat.id);
+  const rotaNumber: Rota.WorkingSchedule | null = subscriptionRota;
   const hasSubscribedToAnyChat = rotaNumber !== null;
 
   if (hasSubscribedToAnyChat) {
     const nextUpdateForSubscription =
-      getNextUpdateDateForRota(rotaNumber) ?? new Date(job.nextInvocation());
+      Rota.getNextUpdateDateForRota(rotaNumber) ??
+      new Date(job.nextInvocation());
 
     const msg = buildAlreadySubscribedMessage(
       rotaNumber,
@@ -141,7 +132,7 @@ bot.action('set_office_hours', async (ctx) => {
 bot.action('stop_updates', async (ctx) => {
   if (!ctx.chat) return;
   try {
-    await removeChatFromAllSubscriptions(ctx.chat.id);
+    await Redis.removeChatFromAllSubscriptions(ctx.chat.id);
   } catch (err) {
     logger.error(`Failed to remove chat ID from subscriptions: ${err}`);
   }
@@ -149,9 +140,9 @@ bot.action('stop_updates', async (ctx) => {
   ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
 });
 
-async function assignRota(rotaNumber: WorkingSchedule, ctx: any) {
+async function assignRota(rotaNumber: Rota.WorkingSchedule, ctx: any) {
   try {
-    await setRotaSubscription(ctx.chat.id, rotaNumber);
+    await Redis.setRotaSubscription(ctx.chat.id, rotaNumber);
   } catch (err) {
     logger.error(`Failed to set rota subscription: ${err}`);
   }
@@ -169,7 +160,10 @@ bot.command('weather', async (ctx) => {
 
   const loadingMessage = await ctx.reply(LOADING_MESSAGE);
 
-  await sendOnDemandWeatherMessage(bot, ctx.chat.id, loadingMessage.message_id);
+  await WeatherReportSender.sendWeatherMessages(bot, [ctx.chat.id], {
+    jobDate: new Date(),
+    editMessageId: loadingMessage.message_id,
+  });
 
   logger.info(
     'Processed on-demand weather data for user: ' +
@@ -183,13 +177,13 @@ bot.command('weather', async (ctx) => {
 
 bot.command('stop', async (ctx) => {
   const chatId = ctx.chat.id;
-  await removeChatFromAllSubscriptions(chatId);
+  await Redis.removeChatFromAllSubscriptions(chatId);
   await ctx.reply(STOP_SUCCESS_MESSAGE);
   logger.info(`Stop command called by Chat ID: ${chatId}.`);
 });
 
 bot.command('settings', async (ctx) => {
-  const rotaNumber = await getChatSubscriptionRota(ctx.chat.id);
+  const rotaNumber = await Redis.getChatSubscriptionRota(ctx.chat.id);
 
   if (rotaNumber === null) {
     await ctx.telegram.sendMessage(

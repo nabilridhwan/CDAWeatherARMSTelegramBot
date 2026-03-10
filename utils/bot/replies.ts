@@ -1,8 +1,7 @@
 import { job } from '../../bot';
-import getNextUpdateDateForRota from '../schedule/getNextUpdateDateForRota';
+import { Rota } from '../schedule/rota';
 import { WeatherReadings } from '../weather/fetchWeatherReadings';
 import getWBGTEmoji from '../weather/getWBGTEmoji';
-import { WorkingSchedule } from './subscriptions';
 
 type WeatherSnapshot = {
   heatStress: string;
@@ -49,7 +48,7 @@ export function buildWeatherReply(
 }
 
 export function buildAlreadySubscribedMessage(
-  rotaNumber: WorkingSchedule,
+  rotaNumber: Rota.WorkingSchedule,
   nextUpdate: Date,
 ) {
   const schedule =
@@ -77,7 +76,7 @@ Reports are sent every weekday at 09:50, 11:50, 13:50, and 15:50 SGT.
 
 Use /settings to change your schedule or unsubscribe at any time.`;
 
-export function buildSettingsMessages(rotaNumber: number | 'office_hours') {
+export function buildSettingsMessages(rotaNumber: Rota.WorkingSchedule) {
   const schedule =
     rotaNumber === 'office_hours' ? 'Office Hours' : `Rota ${rotaNumber}`;
 
@@ -91,8 +90,9 @@ To change your schedule, select a different option below. To stop updates, press
 export const SETROTA_ERROR_MESSAGE =
   'An error occurred while setting your rota. Please try again later.';
 
-export function buildRotaSetSuccessMessage(rota: WorkingSchedule) {
-  const date = getNextUpdateDateForRota(rota) ?? new Date(job.nextInvocation());
+export function buildRotaSetSuccessMessage(rota: Rota.WorkingSchedule) {
+  const date =
+    Rota.getNextUpdateDateForRota(rota) ?? new Date(job.nextInvocation());
 
   if (rota === 'office_hours') {
     return `✅ You're subscribed to Office Hours. You will receive weather updates every weekday. To change your schedule or stop updates, use the /settings command.

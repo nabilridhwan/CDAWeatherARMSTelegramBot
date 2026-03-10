@@ -1,4 +1,5 @@
 import { Context, Telegraf } from 'telegraf';
+
 import {
   buildEscapedWeatherReply,
   buildWeatherFetchFailedMessage,
@@ -6,93 +7,131 @@ import {
 import fetchWeatherReadings from '../weather/fetchWeatherReadings';
 import logger from './logger';
 
-export async function sendScheduledWeatherMessages(
-  bot: Telegraf<Context>,
-  chatIds: string[],
-  escapedReply: string,
-) {
-  if (chatIds.length === 0) {
-    return;
-  }
-
-  const sendResults = await Promise.allSettled(
-    chatIds.map(async (chatId) => {
-      try {
-        await bot.telegram.sendMessage(chatId, escapedReply, {
-          parse_mode: 'MarkdownV2',
-        });
-
-        logger.info(`Weather report sent to chat ID: ${chatId}`);
-      } catch (error) {
-        logger.error(
-          `Failed to send weather report to chat ID ${chatId}:`,
-          error,
-        );
-
-        try {
-          await bot.telegram.sendMessage(
-            chatId,
-            buildWeatherFetchFailedMessage(error),
-          );
-        } catch (fallbackError) {
-          logger.error(
-            `Failed to send fallback weather error message to chat ID ${chatId}:`,
-            fallbackError,
-          );
-        }
-      }
-    }),
-  );
-
-  const rejectedCount = sendResults.filter(
-    (result) => result.status === 'rejected',
-  ).length;
-
-  if (rejectedCount > 0) {
-    logger.error(
-      `Scheduled weather send encountered ${rejectedCount} unexpected rejection(s).`,
-    );
-  }
-}
-
-export async function sendOnDemandWeatherMessage(
-  bot: Telegraf<Context>,
-  chatId: number,
-  loadingMessageId: number,
-) {
-  try {
-    const readings = await fetchWeatherReadings();
-    const escapedReply = buildEscapedWeatherReply(readings);
-
-    await bot.telegram.editMessageText(
-      chatId,
-      loadingMessageId,
-      undefined,
-      escapedReply,
-      {
-        parse_mode: 'MarkdownV2',
-      },
-    );
-
-    logger.info(`On-demand weather report sent to chat ID: ${chatId}`);
-  } catch (error) {
-    logger.error(
-      `Failed to process on-demand weather report for chat ID ${chatId}:`,
-      error,
-    );
-
+export namespace WeatherReportSender {
+  async function notifyChatAboutError(
+    bot: Telegraf<Context>,
+    chatId: number,
+    error: unknown,
+    context: string,
+  ) {
     try {
-      await bot.telegram.editMessageText(
+      await bot.telegram.sendMessage(
         chatId,
-        loadingMessageId,
-        undefined,
         buildWeatherFetchFailedMessage(error),
       );
-    } catch (fallbackError) {
+    } catch (notifyError) {
       logger.error(
-        `Failed to edit loading message with fallback text for chat ID ${chatId}:`,
-        fallbackError,
+        `Failed to send error message to chat ID ${chatId} after ${context}:`,
+        notifyError,
       );
     }
   }
+
+  export async function sendWeatherMessages(
+    bot: Telegraf<Context>,
+    chatIds: number[],
+    opts: Parameters<typeof buildEscapedWeatherReply>[1] & {
+      editMessageId?: number;
+    },
+  ) {
+    if (chatIds.length === 0) {
+      return;
+    }
+
+    let escapedReply: string;
+
+    try {
+      const readings = await fetchWeatherReadings();
+      escapedReply = buildEscapedWeatherReply(readings, opts);
+    } catch (error) {
+      logger.error(
+        'Failed to fetch weather readings before sending reports:',
+        error,
+      );
+
+      await Promise.all(
+        chatIds.map((chatId) =>
+          notifyChatAboutError(bot, chatId, error, 'weather fetch failure'),
+        ),
+      );
+
+      return;
+    }
+
+    // If opts.editMessageId is provided, we will attempt to edit the existing message instead of sending a new one. This is used for on-demand weather updates to replace the loading message with the weather report.
+
+    await Promise.all(
+      chatIds.map(async (chatId) => {
+        try {
+          if (opts.editMessageId != null) {
+            await bot.telegram.editMessageText(
+              chatId,
+              opts.editMessageId,
+              undefined,
+              escapedReply,
+              {
+                parse_mode: 'MarkdownV2',
+              },
+            );
+
+            logger.info(`Weather report edited for chat ID: ${chatId}`);
+            return;
+          }
+
+          await bot.telegram.sendMessage(chatId, escapedReply, {
+            parse_mode: 'MarkdownV2',
+          });
+
+          logger.info(`Weather report sent to chat ID: ${chatId}`);
+        } catch (error) {
+          logger.error(
+            `Failed to send weather report to chat ID ${chatId}:`,
+            error,
+          );
+
+          await notifyChatAboutError(
+            bot,
+            chatId,
+            error,
+            'weather report send/edit failure',
+          );
+        }
+      }),
+    );
+  }
+
+  // export async function sendOnDemandWeatherMessage(
+  //   bot: Telegraf<Context>,
+  //   chatId: number,
+  //   loadingMessageId: number,
+  // ) {
+  //   try {
+  //     const readings = await fetchWeatherReadings();
+  //     const escapedReply = buildEscapedWeatherReply(readings);
+
+  //     await bot.telegram.editMessageText(
+  //       chatId,
+  //       loadingMessageId,
+  //       undefined,
+  //       escapedReply,
+  //       {
+  //         parse_mode: 'MarkdownV2',
+  //       },
+  //     );
+
+  //     logger.info(`On-demand weather report sent to chat ID: ${chatId}`);
+  //   } catch (error) {
+  //     logger.error(
+  //       `Failed to process on-demand weather report for chat ID ${chatId}:`,
+  //       error,
+  //     );
+
+  //     await notifyChatAboutError(
+  //       bot,
+  //       chatId,
+  //       error,
+  //       'on-demand weather report failure',
+  //     );
+  //   }
+  // }
 }

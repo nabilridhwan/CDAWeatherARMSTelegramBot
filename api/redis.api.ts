@@ -1,0 +1,100 @@
+import logger from '../utils/infra/logger';
+import redis from '../utils/infra/redis';
+import { Rota } from '../utils/schedule/rota';
+
+export namespace Redis {
+  export async function testConnection(): Promise<void> {
+    try {
+      await redis.ping();
+      console.log('Successfully connected to Redis');
+    } catch (error) {
+      console.error('Failed to connect to Redis:', error);
+      throw error;
+    }
+  }
+
+  export async function getSubscribedChatIdsForDate(
+    fireDate: Date,
+  ): Promise<string[]> {
+    const rotaNumber = Rota.getRotaNumberForDate(fireDate);
+
+    const [allWeekdaySubscribers, rotaSubscribers] = await Promise.all([
+      redis.smembers(Rota.REDIS_KEY_OFFICE_HOURS_CHAT_IDS),
+      redis.smembers(Rota.getRedisKeyForRota(rotaNumber)),
+    ]);
+
+    return Array.from(new Set([...allWeekdaySubscribers, ...rotaSubscribers]));
+  }
+
+  export async function getAllSubscribedChatIdsForDate(
+    fireDate: Date,
+  ): Promise<string[]> {
+    const rotaNumber = Rota.getRotaNumberForDate(fireDate);
+
+    const [allWeekdaySubscribers, rotaSubscribers] = await Promise.all([
+      redis.smembers(Rota.REDIS_KEY_OFFICE_HOURS_CHAT_IDS),
+      redis.smembers(Rota.getRedisKeyForRota(rotaNumber)),
+    ]);
+
+    return Array.from(new Set([...allWeekdaySubscribers, ...rotaSubscribers]));
+  }
+
+  export async function removeChatFromAllSubscriptions(chatId: number) {
+    await Promise.all([
+      redis.srem(Rota.REDIS_KEY_OFFICE_HOURS_CHAT_IDS, chatId),
+      redis.srem(Rota.getRedisKeyForRota(1), chatId),
+      redis.srem(Rota.getRedisKeyForRota(2), chatId),
+      redis.srem(Rota.getRedisKeyForRota(3), chatId),
+    ]);
+  }
+
+  export async function setRotaSubscription(
+    chatId: number,
+    rotaNumber: Rota.WorkingSchedule,
+  ): Promise<void> {
+    await removeChatFromAllSubscriptions(chatId);
+
+    if (rotaNumber === 'office_hours') {
+      await redis.sadd(Rota.REDIS_KEY_OFFICE_HOURS_CHAT_IDS, chatId);
+      logger.info(`Set Chat ID: ${chatId} to Office Hours subscription.`);
+      return;
+    }
+
+    await redis.sadd(Rota.getRedisKeyForRota(rotaNumber), chatId);
+    logger.info(`Set Chat ID: ${chatId} to Rota ${rotaNumber}.`);
+  }
+
+  export async function getChatSubscriptionRota(
+    chatId: number,
+  ): Promise<Rota.WorkingSchedule | null> {
+    const [
+      isSubscribedOfficeHours,
+      isSubscribedToRota1,
+      isSubscribedToRota2,
+      isSubscribedToRota3,
+    ] = await Promise.all([
+      redis.sismember(Rota.REDIS_KEY_OFFICE_HOURS_CHAT_IDS, chatId),
+      redis.sismember(Rota.getRedisKeyForRota(1), chatId),
+      redis.sismember(Rota.getRedisKeyForRota(2), chatId),
+      redis.sismember(Rota.getRedisKeyForRota(3), chatId),
+    ]);
+
+    if (isSubscribedOfficeHours == 1) {
+      return 'office_hours';
+    }
+
+    if (isSubscribedToRota1 == 1) {
+      return 1;
+    }
+
+    if (isSubscribedToRota2 == 1) {
+      return 2;
+    }
+
+    if (isSubscribedToRota3 == 1) {
+      return 3;
+    }
+
+    return null;
+  }
+}
