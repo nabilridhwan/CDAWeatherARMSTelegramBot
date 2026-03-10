@@ -1,10 +1,32 @@
+import { configDotenv } from 'dotenv';
+import RedisClient from 'ioredis';
 import logger from '../utils/infra/logger';
-import redis from '../utils/infra/redis';
 import { Rota } from '../utils/schedule/rota';
 
+configDotenv();
+
 export namespace Redis {
+  export const redisConnectionOptions = {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    password: process.env.REDIS_PASSWORD || undefined,
+    family: 6,
+    maxRetriesPerRequest: null,
+  };
+
+  let redisClient: RedisClient | null = null;
+
+  function getRedisClient(): RedisClient {
+    if (!redisClient) {
+      redisClient = new RedisClient(redisConnectionOptions);
+    }
+
+    return redisClient;
+  }
+
   export async function testConnection(): Promise<void> {
     try {
+      const redis = getRedisClient();
       await redis.ping();
       console.log('Successfully connected to Redis');
     } catch (error) {
@@ -16,6 +38,7 @@ export namespace Redis {
   export async function getSubscribedChatIdsForDate(
     fireDate: Date,
   ): Promise<string[]> {
+    const redis = getRedisClient();
     const rotaNumber = Rota.getRotaNumberForDate(fireDate);
 
     const [allWeekdaySubscribers, rotaSubscribers] = await Promise.all([
@@ -27,6 +50,7 @@ export namespace Redis {
   }
 
   export async function removeChatFromAllSubscriptions(chatId: number) {
+    const redis = getRedisClient();
     await Promise.all([
       redis.srem(Rota.REDIS_KEY_OFFICE_HOURS_CHAT_IDS, chatId),
       redis.srem(Rota.getRedisKeyForRota(1), chatId),
@@ -39,6 +63,7 @@ export namespace Redis {
     chatId: number,
     rotaNumber: Rota.WorkingSchedule,
   ): Promise<void> {
+    const redis = getRedisClient();
     await removeChatFromAllSubscriptions(chatId);
 
     if (rotaNumber === 'office_hours') {
@@ -54,6 +79,7 @@ export namespace Redis {
   export async function getChatSubscriptionRota(
     chatId: number,
   ): Promise<Rota.WorkingSchedule | null> {
+    const redis = getRedisClient();
     const [
       isSubscribedOfficeHours,
       isSubscribedToRota1,
