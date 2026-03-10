@@ -4,6 +4,16 @@ import logger from '../utils/infra/logger';
 import { Rota } from '../utils/schedule/rota';
 
 export namespace Redis {
+  const environment = env.NODE_ENV === 'production' ? 'prod' : 'dev';
+  const WEATHER_JOB_LOCK_KEY_PREFIX = `${environment}:locks:weather_job`;
+  const RELEASE_LOCK_SCRIPT = `
+    if redis.call("GET", KEYS[1]) == ARGV[1] then
+      return redis.call("DEL", KEYS[1])
+    else
+      return 0
+    end
+  `;
+
   export const redisConnectionOptions = {
     host: env.REDIS_HOST,
     port: env.REDIS_PORT,
@@ -32,6 +42,38 @@ export namespace Redis {
       throw error;
     }
   }
+
+  export function getWeatherJobLockKey(fireDate: Date): string {
+    const minuteSlot = Math.floor(fireDate.getTime() / 60_000);
+    return `${WEATHER_JOB_LOCK_KEY_PREFIX}:${minuteSlot}`;
+  }
+
+  export async function acquireDistributedLock(
+    lockKey: string,
+    lockValue: string,
+    ttlSeconds: number,
+  ): Promise<boolean> {
+    const redis = getRedisClient();
+    const lockResult = await redis.set(
+      lockKey,
+      lockValue,
+      'EX',
+      ttlSeconds,
+      'NX',
+    );
+
+    return lockResult === 'OK';
+  }
+
+  export async function releaseDistributedLock(
+    lockKey: string,
+    lockValue: string,
+  ): Promise<boolean> {
+    const redis = getRedisClient();
+    const result = await redis.eval(RELEASE_LOCK_SCRIPT, 1, lockKey, lockValue);
+    return result === 1;
+  }
+
   export async function assignRota(rotaNumber: Rota.WorkingSchedule, ctx: any) {
     try {
       await Redis.setRotaSubscription(ctx.chat.id, rotaNumber);

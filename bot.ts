@@ -1,4 +1,5 @@
 import schedule from 'node-schedule';
+import { randomUUID } from 'node:crypto';
 import { Markup, Telegraf } from 'telegraf';
 import { Redis } from './api/redis.api';
 import {
@@ -186,9 +187,27 @@ function registerHandlers(bot: Telegraf, job: schedule.Job) {
 // Creates the scheduler job lazily so importing this module does not start background work.
 function createJob(bot: Telegraf): schedule.Job {
   return schedule.scheduleJob(rule, async (fireDate) => {
+    const jobDate = new Date(fireDate);
+    const lockKey = Redis.getWeatherJobLockKey(jobDate);
+    const lockValue = randomUUID();
+    const lockTtlSeconds = 120;
+
     try {
+      const lockAcquired = await Redis.acquireDistributedLock(
+        lockKey,
+        lockValue,
+        lockTtlSeconds,
+      );
+
+      if (!lockAcquired) {
+        logger.info(
+          `Skipped weather send at ${jobDate.toISOString()} because scheduler lock is already held by another instance.`,
+        );
+        return;
+      }
+
       const subscribedChatIds =
-        await Redis.getSubscribedChatIdsForDate(fireDate);
+        await Redis.getSubscribedChatIdsForDate(jobDate);
 
       if (subscribedChatIds.length === 0) {
         logger.info('No subscribed chat IDs found. Skipping weather report.');
@@ -199,7 +218,7 @@ function createJob(bot: Telegraf): schedule.Job {
         bot,
         subscribedChatIds.map((id) => parseInt(id, 10)),
         {
-          jobDate: new Date(fireDate),
+          jobDate,
         },
       );
 
@@ -211,6 +230,12 @@ function createJob(bot: Telegraf): schedule.Job {
       );
     } catch (error) {
       logger.error('Error fetching weather data:', error);
+    } finally {
+      try {
+        await Redis.releaseDistributedLock(lockKey, lockValue);
+      } catch (error) {
+        logger.error('Failed to release scheduler lock:', error);
+      }
     }
   });
 }
