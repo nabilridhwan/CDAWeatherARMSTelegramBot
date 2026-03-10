@@ -1,4 +1,4 @@
-import { rule } from '../../bot';
+import { rule } from '../bot/rule';
 
 export namespace Rota {
   export type RotaNumber = 1 | 2 | 3;

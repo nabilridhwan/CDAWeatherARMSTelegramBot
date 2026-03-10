@@ -1,5 +1,4 @@
 import { Weather } from '../../api/weather.api';
-import { job } from '../../bot';
 import { Rota } from '../schedule/rota';
 
 function formatSingaporeDate(date: Date | string) {
@@ -81,20 +80,20 @@ To change your schedule, select a different option below. To stop updates, press
 export const SETROTA_ERROR_MESSAGE =
   'An error occurred while setting your rota. Please try again later.';
 
-export function buildRotaSetSuccessMessage(rota: Rota.WorkingSchedule) {
-  const date =
-    Rota.getNextUpdateDateForRota(rota) ?? new Date(job.nextInvocation());
-
+export function buildRotaSetSuccessMessage(
+  rota: Rota.WorkingSchedule,
+  nextJobRun: Date,
+) {
   if (rota === 'office_hours') {
     return `✅ You're subscribed to Office Hours. You will receive weather updates every weekday. To change your schedule or stop updates, use the /settings command.
     
-Next update: ${formatSingaporeDate(date)}
+Next update: ${formatSingaporeDate(nextJobRun)}
     `;
   }
 
   return `✅ You're subscribed to Rota ${rota}. You will receive weather updates on your rota working days. To change your rota or stop updates, use the /settings command.
 
-Next update: ${formatSingaporeDate(date)}
+Next update: ${formatSingaporeDate(nextJobRun)}
   `;
 }
 

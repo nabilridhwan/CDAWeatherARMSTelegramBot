@@ -10,6 +10,7 @@ import {
   STOP_SUCCESS_MESSAGE,
   WELCOME_SUBSCRIBED_MESSAGE,
 } from './utils/bot/replies';
+import { rule } from './utils/bot/rule';
 import { WeatherReportSender } from './utils/bot/weatherReportSender';
 import logger from './utils/infra/logger';
 import { generateVersionInfoMessage } from './utils/infra/version';
@@ -20,13 +21,6 @@ export const bot = new Telegraf(process.env.BOT_ID!);
 // ==============================
 // Scheduled job to send weather updates
 // ==============================
-
-// Cron rule to run every weekday at 09:50, 11:50, 13:50, and 15:50 in Singapore timezone
-export const rule = new schedule.RecurrenceRule();
-rule.dayOfWeek = new schedule.Range(1, 5); // Monday to Friday
-rule.hour = [9, 11, 13, 15];
-rule.minute = 50;
-rule.tz = 'Singapore';
 
 export const job = schedule.scheduleJob(rule, async (fireDate) => {
   try {
@@ -106,26 +100,30 @@ bot.start(async (ctx) => {
 // ==============================
 bot.action('set_rota_1', async (ctx) => {
   await assignRota(1, ctx);
-  ctx.editMessageText(buildRotaSetSuccessMessage(1));
+  const nextUpdate = Rota.getNextUpdateDateForRota(1) || job.nextInvocation();
+  ctx.editMessageText(buildRotaSetSuccessMessage(1, nextUpdate));
   ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
 });
 
 bot.action('set_rota_2', async (ctx) => {
   // call assignRota
   await assignRota(2, ctx);
-  ctx.editMessageText(buildRotaSetSuccessMessage(2));
+  const nextUpdate = Rota.getNextUpdateDateForRota(2) || job.nextInvocation();
+  ctx.editMessageText(buildRotaSetSuccessMessage(2, nextUpdate));
   ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
 });
 
 bot.action('set_rota_3', async (ctx) => {
   await assignRota(3, ctx);
-  ctx.editMessageText(buildRotaSetSuccessMessage(3));
+  const nextUpdate = Rota.getNextUpdateDateForRota(3) || job.nextInvocation();
+  ctx.editMessageText(buildRotaSetSuccessMessage(3, nextUpdate));
   ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
 });
 
 bot.action('set_office_hours', async (ctx) => {
   await assignRota('office_hours', ctx);
-  ctx.editMessageText(buildRotaSetSuccessMessage('office_hours'));
+  const nextUpdate = job.nextInvocation();
+  ctx.editMessageText(buildRotaSetSuccessMessage('office_hours', nextUpdate));
   ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
 });
 
