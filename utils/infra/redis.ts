@@ -1,4 +1,7 @@
+import { configDotenv } from 'dotenv';
 import Redis from 'ioredis';
+
+configDotenv();
 
 export const redisConnectionOptions = {
   host: process.env.REDIS_HOST || 'localhost',

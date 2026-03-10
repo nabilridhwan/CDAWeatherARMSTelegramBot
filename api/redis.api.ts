@@ -26,19 +26,6 @@ export namespace Redis {
     return Array.from(new Set([...allWeekdaySubscribers, ...rotaSubscribers]));
   }
 
-  export async function getAllSubscribedChatIdsForDate(
-    fireDate: Date,
-  ): Promise<string[]> {
-    const rotaNumber = Rota.getRotaNumberForDate(fireDate);
-
-    const [allWeekdaySubscribers, rotaSubscribers] = await Promise.all([
-      redis.smembers(Rota.REDIS_KEY_OFFICE_HOURS_CHAT_IDS),
-      redis.smembers(Rota.getRedisKeyForRota(rotaNumber)),
-    ]);
-
-    return Array.from(new Set([...allWeekdaySubscribers, ...rotaSubscribers]));
-  }
-
   export async function removeChatFromAllSubscriptions(chatId: number) {
     await Promise.all([
       redis.srem(Rota.REDIS_KEY_OFFICE_HOURS_CHAT_IDS, chatId),

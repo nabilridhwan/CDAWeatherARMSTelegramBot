@@ -1,11 +1,11 @@
 import { Context, Telegraf } from 'telegraf';
 
+import { Weather } from '../../api/weather.api';
+import logger from '../infra/logger';
 import {
   buildEscapedWeatherReply,
   buildWeatherFetchFailedMessage,
-} from '../bot/replies';
-import fetchWeatherReadings from '../weather/fetchWeatherReadings';
-import logger from './logger';
+} from './replies';
 
 export namespace WeatherReportSender {
   async function notifyChatAboutError(
@@ -41,7 +41,7 @@ export namespace WeatherReportSender {
     let escapedReply: string;
 
     try {
-      const readings = await fetchWeatherReadings();
+      const readings = await Weather.retrieveWeatherDataForBot();
       escapedReply = buildEscapedWeatherReply(readings, opts);
     } catch (error) {
       logger.error(
@@ -106,7 +106,7 @@ export namespace WeatherReportSender {
   //   loadingMessageId: number,
   // ) {
   //   try {
-  //     const readings = await fetchWeatherReadings();
+  //     const readings = await Weather.retrieveWeatherDataForBot();
   //     const escapedReply = buildEscapedWeatherReply(readings);
 
   //     await bot.telegram.editMessageText(

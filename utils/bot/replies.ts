@@ -1,15 +1,7 @@
+import { Weather } from '../../api/weather.api';
 import { job } from '../../bot';
 import { Rota } from '../schedule/rota';
-import { WeatherReadings } from '../weather/fetchWeatherReadings';
 import getWBGTEmoji from '../weather/getWBGTEmoji';
-
-type WeatherSnapshot = {
-  heatStress: string;
-  wbgt: string;
-  airTemp: number;
-  emoji: string;
-  dateTime: string;
-};
 
 function formatSingaporeDate(date: Date | string) {
   return new Date(date).toLocaleString('en-SG', { timeZone: 'Asia/Singapore' });
@@ -23,8 +15,8 @@ export function escapeMarkdownV2(reply: string) {
 }
 
 export function buildWeatherReply(
-  cda: WeatherSnapshot,
-  httc: WeatherSnapshot,
+  cda: Weather.Types.WeatherSnapshot,
+  httc: Weather.Types.WeatherSnapshot,
   options?: {
     jobDate?: Date;
     nextUpdate?: Date;
@@ -174,7 +166,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function buildEscapedWeatherReply(
-  readings: WeatherReadings,
+  readings: Weather.Types.WeatherReadings,
   options?: {
     jobDate?: Date;
     nextUpdate?: Date;

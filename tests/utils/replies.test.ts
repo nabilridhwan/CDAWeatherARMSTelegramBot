@@ -1,9 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildWeatherFetchFailedMessage,
   buildWeatherReply,
   escapeMarkdownV2,
 } from '../../utils/bot/replies';
+
+vi.mock('../../bot', () => ({
+  rule: {
+    nextInvocationDate: vi.fn(),
+  },
+  job: {
+    nextInvocation: vi.fn(() => new Date('2026-03-10T09:50:00+08:00')),
+  },
+}));
 
 describe('replies', () => {
   it('builds weather reply with both sites and latest update time', () => {

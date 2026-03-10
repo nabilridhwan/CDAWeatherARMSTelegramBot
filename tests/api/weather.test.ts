@@ -70,8 +70,11 @@ describe('weather api', () => {
 
     mockedAxiosGet.mockResolvedValueOnce({ data: wbgtApiResponse });
 
-    const { getWGBTFromLatLng } = await import('../../api/weather');
-    const reading = await getWGBTFromLatLng(1.3001, 103.7601);
+    const { Weather } = await import('../../api/weather.api');
+    const reading = await Weather.BaseAPI.fetchWBGTFromCoordinates(
+      1.3001,
+      103.7601,
+    );
 
     expect(mockedAxiosGet).toHaveBeenCalledWith(
       'https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt',
@@ -109,8 +112,8 @@ describe('weather api', () => {
 
     mockedAxiosGet.mockResolvedValueOnce({ data: wbgtApiResponse });
 
-    const { getWGBTFromLatLng } = await import('../../api/weather');
-    const reading = await getWGBTFromLatLng(1.3, 103.8);
+    const { Weather } = await import('../../api/weather.api');
+    const reading = await Weather.BaseAPI.fetchWBGTFromCoordinates(1.3, 103.8);
 
     expect(reading).toEqual({
       wbgt: '',
@@ -175,8 +178,11 @@ describe('weather api', () => {
 
     mockedAxiosGet.mockResolvedValueOnce({ data: airTempApiResponse });
 
-    const { getAirTempFromLatLng } = await import('../../api/weather');
-    const reading = await getAirTempFromLatLng(1.3001, 103.7601);
+    const { Weather } = await import('../../api/weather.api');
+    const reading = await Weather.BaseAPI.fetchAirTemperatureFromCoordinates(
+      1.3001,
+      103.7601,
+    );
 
     expect(mockedAxiosGet).toHaveBeenCalledWith(
       'https://api-open.data.gov.sg/v2/real-time/api/air-temperature',
@@ -239,8 +245,11 @@ describe('weather api', () => {
 
     mockedAxiosGet.mockResolvedValueOnce({ data: airTempApiResponse });
 
-    const { getAirTempFromLatLng } = await import('../../api/weather');
-    const reading = await getAirTempFromLatLng(1.3, 103.76);
+    const { Weather } = await import('../../api/weather.api');
+    const reading = await Weather.BaseAPI.fetchAirTemperatureFromCoordinates(
+      1.3,
+      103.76,
+    );
 
     expect(reading.value).toBe(-1);
     expect(reading.dateTime).toBe('2026-03-02T10:00:00+08:00');

@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Rota } from '../../utils/schedule/rota';
 
+vi.mock('../../bot', () => ({
+  rule: {
+    nextInvocationDate: vi.fn(),
+  },
+  job: {
+    nextInvocation: vi.fn(() => new Date('2026-03-10T09:50:00+08:00')),
+  },
+}));
+
 describe('getRotaNumberForDate', () => {
   afterEach(() => {
     vi.useRealTimers();

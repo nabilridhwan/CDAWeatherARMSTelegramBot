@@ -10,9 +10,9 @@ import {
   STOP_SUCCESS_MESSAGE,
   WELCOME_SUBSCRIBED_MESSAGE,
 } from './utils/bot/replies';
+import { WeatherReportSender } from './utils/bot/weatherReportSender';
 import logger from './utils/infra/logger';
 import { generateVersionInfoMessage } from './utils/infra/version';
-import { WeatherReportSender } from './utils/infra/weatherReportSender';
 import { Rota } from './utils/schedule/rota';
 
 export const bot = new Telegraf(process.env.BOT_ID!);
