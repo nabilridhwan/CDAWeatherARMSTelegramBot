@@ -149,13 +149,6 @@ function registerHandlers(bot: Telegraf, job: schedule.Job) {
     );
   });
 
-  bot.command('stop', async (ctx) => {
-    const chatId = ctx.chat.id;
-    await Redis.removeChatFromAllSubscriptions(chatId);
-    await ctx.reply(STOP_SUCCESS_MESSAGE);
-    logger.info(`Stop command called by Chat ID: ${chatId}.`);
-  });
-
   bot.command('settings', async (ctx) => {
     const rotaNumber = await Redis.getChatSubscriptionRota(ctx.chat.id);
 
