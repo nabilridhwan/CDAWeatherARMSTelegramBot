@@ -1,6 +1,7 @@
 import schedule from 'node-schedule';
 import { randomUUID } from 'node:crypto';
 import { Markup, Telegraf } from 'telegraf';
+import { Lightning } from './api/lightning.api';
 import { Redis } from './api/redis.api';
 import {
   buildAlreadySubscribedMessage,
@@ -142,6 +143,32 @@ function registerHandlers(bot: Telegraf, job: schedule.Job) {
         ctx.from.id +
         ') in chat ID: ' +
         ctx.chat.id,
+    );
+  });
+
+  bot.command('lightning', async (ctx) => {
+    logger.info(
+      'Lightning command called by user: ' +
+        ctx.from.username +
+        ' (ID: ' +
+        ctx.from.id +
+        ') in chat ID: ' +
+        ctx.chat.id,
+    );
+
+    const loadingMessage = await ctx.reply(LOADING_MESSAGE);
+
+    const data = await Lightning.retrieveLightningData(
+      Lightning.Defaults.CDA.latitude,
+      Lightning.Defaults.CDA.longitude,
+      'CDA',
+    );
+
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      loadingMessage.message_id,
+      undefined,
+      `${data.message}\n\nLast checked at ${data.last_checked}`,
     );
   });
 

@@ -25,6 +25,7 @@
   "dependencies": {
     "@t3-oss/env-core": "^0.13.10",
     "axios-retry": "^4.5.0",
+    "date-fns": "^4.1.0",
     "dotenv": "^17.0.1",
     "express": "^5.1.0",
     "haversine-distance": "^1.2.4",
