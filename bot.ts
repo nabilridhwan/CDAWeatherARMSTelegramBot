@@ -28,6 +28,73 @@ export function createBot(): Telegraf {
   return new Telegraf(env.BOT_ID);
 }
 
+function registerBotActionHandlers(bot: Telegraf, job: schedule.Job) {
+  // ==============================
+  // #region Callback query handlers for setting rota subscriptions
+  // ==============================
+  bot.action('set_rota_1', async (ctx) => {
+    await Redis.assignRota(1, ctx);
+    const nextUpdate = Rota.getNextUpdateDateForRota(1) || job.nextInvocation();
+    ctx.editMessageText(buildRotaSetSuccessMessage(1, nextUpdate));
+    ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
+  });
+
+  bot.action('set_rota_2', async (ctx) => {
+    // call assignRota
+    await Redis.assignRota(2, ctx);
+    const nextUpdate = Rota.getNextUpdateDateForRota(2) || job.nextInvocation();
+    ctx.editMessageText(buildRotaSetSuccessMessage(2, nextUpdate));
+    ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
+  });
+
+  bot.action('set_rota_3', async (ctx) => {
+    await Redis.assignRota(3, ctx);
+    const nextUpdate = Rota.getNextUpdateDateForRota(3) || job.nextInvocation();
+    ctx.editMessageText(buildRotaSetSuccessMessage(3, nextUpdate));
+    ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
+  });
+
+  bot.action('set_office_hours', async (ctx) => {
+    await Redis.assignRota('office_hours', ctx);
+    const nextUpdate = job.nextInvocation();
+    ctx.editMessageText(buildRotaSetSuccessMessage('office_hours', nextUpdate));
+    ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
+  });
+
+  bot.action('stop_updates', async (ctx) => {
+    if (!ctx.chat) return;
+    try {
+      await Redis.removeChatFromAllSubscriptions(ctx.chat.id);
+    } catch (err) {
+      logger.error(`Failed to remove chat ID from subscriptions: ${err}`);
+    }
+    ctx.editMessageText(STOP_SUCCESS_MESSAGE);
+    ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
+  });
+
+  bot.action('lightning_cda', async (ctx) => {
+    const data = await Lightning.retrieveLightningData(
+      Lightning.Defaults.CDA.latitude,
+      Lightning.Defaults.CDA.longitude,
+      'CDA',
+    );
+
+    ctx.editMessageText(data.message);
+    ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
+  });
+
+  bot.action('lightning_httc', async (ctx) => {
+    const data = await Lightning.retrieveLightningData(
+      Lightning.Defaults.HTTC.latitude,
+      Lightning.Defaults.HTTC.longitude,
+      'HTTC',
+    );
+
+    ctx.editMessageText(data.message);
+    ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
+  });
+}
+
 // Registers all bot commands/actions against provided runtime instances.
 // Injecting bot/job here keeps handler setup explicit and decoupled from module import.
 function registerHandlers(bot: Telegraf, job: schedule.Job) {
@@ -76,49 +143,6 @@ function registerHandlers(bot: Telegraf, job: schedule.Job) {
     logger.info('Added Chat ID: ' + ctx.chat.id + ' to subscribed chat IDs.');
   });
 
-  // ==============================
-  // #region Callback query handlers for setting rota subscriptions
-  // ==============================
-  bot.action('set_rota_1', async (ctx) => {
-    await Redis.assignRota(1, ctx);
-    const nextUpdate = Rota.getNextUpdateDateForRota(1) || job.nextInvocation();
-    ctx.editMessageText(buildRotaSetSuccessMessage(1, nextUpdate));
-    ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
-  });
-
-  bot.action('set_rota_2', async (ctx) => {
-    // call assignRota
-    await Redis.assignRota(2, ctx);
-    const nextUpdate = Rota.getNextUpdateDateForRota(2) || job.nextInvocation();
-    ctx.editMessageText(buildRotaSetSuccessMessage(2, nextUpdate));
-    ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
-  });
-
-  bot.action('set_rota_3', async (ctx) => {
-    await Redis.assignRota(3, ctx);
-    const nextUpdate = Rota.getNextUpdateDateForRota(3) || job.nextInvocation();
-    ctx.editMessageText(buildRotaSetSuccessMessage(3, nextUpdate));
-    ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
-  });
-
-  bot.action('set_office_hours', async (ctx) => {
-    await Redis.assignRota('office_hours', ctx);
-    const nextUpdate = job.nextInvocation();
-    ctx.editMessageText(buildRotaSetSuccessMessage('office_hours', nextUpdate));
-    ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
-  });
-
-  bot.action('stop_updates', async (ctx) => {
-    if (!ctx.chat) return;
-    try {
-      await Redis.removeChatFromAllSubscriptions(ctx.chat.id);
-    } catch (err) {
-      logger.error(`Failed to remove chat ID from subscriptions: ${err}`);
-    }
-    ctx.editMessageText(STOP_SUCCESS_MESSAGE);
-    ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
-  });
-
   bot.command('weather', async (ctx) => {
     logger.info(
       'Weather command called by user: ' +
@@ -158,17 +182,13 @@ function registerHandlers(bot: Telegraf, job: schedule.Job) {
 
     const loadingMessage = await ctx.reply(LOADING_MESSAGE);
 
-    const data = await Lightning.retrieveLightningData(
-      Lightning.Defaults.CDA.latitude,
-      Lightning.Defaults.CDA.longitude,
-      'CDA',
-    );
-
-    await ctx.telegram.editMessageText(
+    ctx.telegram.sendMessage(
       ctx.chat.id,
-      loadingMessage.message_id,
-      undefined,
-      `${data.message}\n\nLast checked at ${data.last_checked}`,
+      'Please select your location:',
+      Markup.inlineKeyboard([
+        Markup.button.callback('CDA', 'lightning_cda'),
+        Markup.button.callback('HTTC', 'lightning_httc'),
+      ]),
     );
   });
 
@@ -267,6 +287,7 @@ function createJob(bot: Telegraf): schedule.Job {
 export function startBot(): BotRuntime {
   const bot = createBot();
   const job = createJob(bot);
+  registerBotActionHandlers(bot, job);
   registerHandlers(bot, job);
   return { bot, job };
 }
