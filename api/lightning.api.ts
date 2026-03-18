@@ -1,3 +1,4 @@
+import { tz } from '@date-fns/tz';
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
 import { format } from 'date-fns/format';
@@ -14,6 +15,7 @@ import type {
 } from './types/weather';
 
 export namespace Lightning {
+  const SINGAPORE_TIME_ZONE = 'Asia/Singapore';
   const DATA_GOV_TIMEOUT_MS = 5_000;
   const DATA_GOV_MAX_RETRIES = 2;
   const DATA_GOV_BASE_BACKOFF_MS = 300;
@@ -82,6 +84,10 @@ export namespace Lightning {
       logger.error(`Error fetching ${requestName} data:`, error);
       throw error;
     }
+  }
+
+  function formatTimeInSingapore(date: Date): string {
+    return format(date, 'hh:mm a', { in: tz(SINGAPORE_TIME_ZONE) });
   }
 
   export namespace Types {
@@ -221,7 +227,7 @@ export namespace Lightning {
       return {
         message:
           '⚠️ Unable to retrieve lightning data at this time. Please try again later.',
-        last_checked: format(new Date(), 'hh:mm a'),
+        last_checked: formatTimeInSingapore(new Date()),
       };
     }
 
@@ -232,7 +238,7 @@ export namespace Lightning {
 
       return {
         message: '✅ No lightning activity detected across Singapore.',
-        last_checked: format(parsedDate, 'hh:mm a'),
+        last_checked: formatTimeInSingapore(parsedDate),
       };
     }
 
@@ -259,19 +265,34 @@ export namespace Lightning {
     });
 
     const parsedDate = parseISO(latestRecord.datetime);
-    const totalLightning =
-      lightningCount.withinRadius + lightningCount.outsideRadius;
 
-    /*
-      Message format:
-        ✅ No lightning detected within 10 km of CDA.
-        ⚡ 12 strikes detected elsewhere in Singapore.
-        Last checked: 2:38 PM SGT
-      */
+    let str = '';
+
+    if (
+      lightningCount.withinRadius === 0 &&
+      lightningCount.outsideRadius === 0
+    ) {
+      str += `✅ No lightning activity detected across Singapore.\n`;
+    } else if (lightningCount.withinRadius === 0) {
+      str += `✅ No lightning detected within 10 km of '${locationName}'.\n`;
+    } else if (
+      lightningCount.withinRadius > 0 &&
+      lightningCount.outsideRadius === 0
+    ) {
+      str += `⚡ ${lightningCount.withinRadius} strike(s) detected within 10 km of '${locationName}'.\n`;
+    } else if (
+      lightningCount.withinRadius === 0 &&
+      lightningCount.outsideRadius > 0
+    ) {
+      str += `⚡ ${lightningCount.outsideRadius} strike(s) detected elsewhere in Singapore.\n`;
+    } else {
+      str += `⚡ ${lightningCount.withinRadius} strike(s) detected within 10 km of '${locationName}'.\n`;
+      str += `⚡ ${lightningCount.outsideRadius} strike(s) detected elsewhere in Singapore.\n`;
+    }
 
     return {
-      message: `✅ No lightning detected within 10 km of '${locationName}'.\n⚡ ${totalLightning} strike(s) detected elsewhere in Singapore.`,
-      last_checked: format(parsedDate, 'hh:mm a'),
+      message: str,
+      last_checked: formatTimeInSingapore(parsedDate),
     };
   }
 }
