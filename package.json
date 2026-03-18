@@ -23,6 +23,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
+    "@date-fns/tz": "^1.4.1",
     "@t3-oss/env-core": "^0.13.10",
     "axios-retry": "^4.5.0",
     "date-fns": "^4.1.0",

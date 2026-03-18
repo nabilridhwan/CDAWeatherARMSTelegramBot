@@ -1,8 +1,17 @@
+import { tz } from '@date-fns/tz';
+import { format } from 'date-fns/format';
 import { Weather } from '../../api/weather.api';
 import { Rota } from '../schedule/rota';
 
+const SINGAPORE_TIME_ZONE = 'Asia/Singapore';
+
 function formatSingaporeDate(date: Date | string) {
-  return new Date(date).toLocaleString('en-SG', { timeZone: 'Asia/Singapore' });
+  const parsedDate = new Date(date);
+  const formatted = format(parsedDate, 'd MMM yyyy h:mm aa', {
+    in: tz(SINGAPORE_TIME_ZONE),
+  });
+
+  return formatted;
 }
 
 export function escapeMarkdownV2(reply: string) {
