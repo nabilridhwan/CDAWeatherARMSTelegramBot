@@ -29,7 +29,8 @@ export namespace Cache {
     );
   }
 
-  // Get nearest quarter hour TTL. For example, if it's 9:50, the TTL should be 15 minutes (until 10:00). If it's 9:10, the TTL should be 5 minutes (until 9:15). But also add bufferSecs to account for the time taken to fetch and cache the data, so that it doesn't expire before the next request comes in.
+  // Get nearest quarter hour TTL. For example, if it's 9:50, the TTL should be 15 minutes (until 10:00). If it's 9:10, the TTL should be 5 minutes (until 9:15).
+  // Also add bufferSecs to account for the time taken to fetch and cache the data, so that it doesn't expire before the next request comes in.
   export function getNextTTLForCurrentQuarterHour(bufferSecs: number): number {
     const now = new Date();
     const minutes = now.getMinutes();
