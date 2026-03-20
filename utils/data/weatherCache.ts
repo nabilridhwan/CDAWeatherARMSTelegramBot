@@ -1,39 +1,56 @@
 // import redis from '../infra/redis';
+import { tz } from '@date-fns/tz';
+import { formatISO } from 'date-fns';
+import { Redis } from '../../api/redis.api';
+import { Weather } from '../../api/weather.api';
 
-// export const getCachedWeatherData = async (cacheKey: string) => {
-//   try {
-//     const cachedData = await redis.get(cacheKey);
-//     if (cachedData) {
-//       return JSON.parse(cachedData);
-//     }
-//     return null;
-//   } catch (error) {
-//     console.error(
-//       `Error retrieving weather data from cache for key ${cacheKey}:`,
-//       error,
-//     );
-//     return null;
-//   }
-// };
+export namespace Cache {
+  const CACHE_KEY_PREFIX = 'weather';
 
-// namespace Cache {
-//     const CACHE_KEY_PREFIX = 'weather:';
+  export async function getCachedWeatherData(
+    cacheKey: string,
+  ): Promise<Weather.Types.WeatherReadings | null> {
+    const cachedData = await Redis.getRedisClient().get(cacheKey);
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
+    return null;
+  }
 
-//     // Cache function that stores for 15 minutes interval. So that:
-//     // When a user requests at 9:50, it should check if there is cached data from 9:35 to 9:50. If there is, return it. If not, fetch new data and cache it with the current timestamp.
-//     export async function getWeatherDataWithCache<T>(
-//         cacheKeySuffix: string,
-//         fetchFunction: () => Promise<T>,
-//     ): Promise<T> {
-//         const cacheKey = CACHE_KEY_PREFIX + cacheKeySuffix;
-//         const cachedData = await getCachedWeatherData(cacheKey);
+  export async function setCachedWeatherData(
+    cacheKey: string,
+    data: Weather.Types.WeatherReadings,
+  ): Promise<void> {
+    await Redis.getRedisClient().set(
+      cacheKey,
+      JSON.stringify(data),
+      'EX',
+      getNextTTLForCurrentQuarterHour(3 * 60),
+    );
+  }
 
-//         if (cachedData) {
-//             return cachedData;
-//         }
+  // Get nearest quarter hour TTL. For example, if it's 9:50, the TTL should be 15 minutes (until 10:00). If it's 9:10, the TTL should be 5 minutes (until 9:15). But also add bufferSecs to account for the time taken to fetch and cache the data, so that it doesn't expire before the next request comes in.
+  export function getNextTTLForCurrentQuarterHour(bufferSecs: number): number {
+    const now = new Date();
+    const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
+    const totalSeconds = minutes * 60 + seconds;
+    const nextQuarterHourInSeconds =
+      Math.ceil(totalSeconds / (15 * 60)) * (15 * 60);
+    const ttl = nextQuarterHourInSeconds - totalSeconds + bufferSecs;
+    return ttl;
+  }
 
-//         const freshData = await fetchFunction();
-//         await redis.set(cacheKey, JSON.stringify(freshData), 'EX', 15 * 60); // Cache for 15 minutes
-//         return freshData;
-//     }
-// }
+  export function getQuarterHourTimestamp(date: Date): string {
+    const minutes = date.getMinutes();
+    const quarterHour = Math.floor(minutes / 15) * 15;
+    date.setMinutes(quarterHour, 0, 0);
+    return formatISO(date, { in: tz('Asia/Singapore') });
+  }
+
+  export function getCacheKeyForCurrentQuarterHour(): string {
+    const now = new Date();
+    const quarterHourTimestamp = getQuarterHourTimestamp(now);
+    return `${CACHE_KEY_PREFIX}:snapshot:${quarterHourTimestamp}`;
+  }
+}

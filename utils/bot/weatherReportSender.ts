@@ -202,8 +202,9 @@ export namespace WeatherReportSender {
     let escapedReply: string;
 
     try {
-      const readings = await Weather.retrieveWeatherDataForBot();
-      escapedReply = buildEscapedWeatherReply(readings, opts);
+      const { data: readings, isCached } =
+        await Weather.getCachedOrFetchWeatherDataForBot();
+      escapedReply = buildEscapedWeatherReply(readings, { ...opts, isCached });
     } catch (error) {
       logger.error(
         'Failed to fetch weather readings before sending reports:',
@@ -240,8 +241,8 @@ export namespace WeatherReportSender {
   //   loadingMessageId: number,
   // ) {
   //   try {
-  //     const readings = await Weather.retrieveWeatherDataForBot();
-  //     const escapedReply = buildEscapedWeatherReply(readings);
+  //     const { data: readings, isCached } = await Weather.getCachedOrFetchWeatherDataForBot();
+  //     const escapedReply = buildEscapedWeatherReply(readings, { isCached });
 
   //     await bot.telegram.editMessageText(
   //       chatId,

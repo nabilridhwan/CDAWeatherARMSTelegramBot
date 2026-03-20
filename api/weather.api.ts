@@ -1,6 +1,7 @@
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
 import haversine from 'haversine-distance';
+import { Cache } from '../utils/data/weatherCache';
 import { env } from '../utils/infra/env';
 import logger from '../utils/infra/logger';
 import type {
@@ -368,6 +369,28 @@ export namespace Weather {
       cdaAirTemp,
       httcWBGT,
       httcAirTemp,
+    };
+  }
+
+  export async function getCachedOrFetchWeatherDataForBot(): Promise<{
+    data: Weather.Types.WeatherReadings;
+    isCached: boolean;
+  }> {
+    const cacheKey = Cache.getCacheKeyForCurrentQuarterHour();
+    const cachedData = await Cache.getCachedWeatherData(cacheKey);
+
+    if (cachedData) {
+      return {
+        data: cachedData,
+        isCached: true,
+      };
+    }
+
+    const freshData = await retrieveWeatherDataForBot();
+    await Cache.setCachedWeatherData(cacheKey, freshData);
+    return {
+      data: freshData,
+      isCached: false,
     };
   }
 }

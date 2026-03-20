@@ -27,16 +27,21 @@ export function buildWeatherReply(
   options?: {
     jobDate?: Date;
     nextUpdate?: Date;
+    isCached?: boolean;
   },
 ) {
   let baseReply = `*CDA*:\n🌡️ Heat Stress: ${cda.heatStress} ${cda.emoji}\n🌍 WBGT: ${cda.wbgt} °C\n🌬️ Air Temp: ${cda.airTemp} °C\n\n*HTTC*:\n🌡️ Heat Stress: ${httc.heatStress} ${httc.emoji}\n🌍 WBGT: ${httc.wbgt} °C\n🌬️ Air Temp: ${httc.airTemp} °C\n\nLast updated: ${formatSingaporeDate(cda.dateTime)}`;
+
+  if (options?.isCached) {
+    baseReply += '\n*(Cache Hit)*';
+  }
 
   // if (!options?.jobDate || !options?.nextUpdate) {
   //   return baseReply;
   // }
 
   if (options?.jobDate) {
-    baseReply += `\n\nJob date: ${formatSingaporeDate(new Date())}`;
+    baseReply += `\nJob date: ${formatSingaporeDate(new Date())}`;
   }
 
   if (options?.nextUpdate) {
@@ -177,6 +182,7 @@ export function buildEscapedWeatherReply(
   options?: {
     jobDate?: Date;
     nextUpdate?: Date;
+    isCached?: boolean;
   },
 ) {
   const reply = buildWeatherReply(
