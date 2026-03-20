@@ -2,6 +2,9 @@
 # Edit at https://www.toptal.com/developers/gitignore?templates=node
 
 .idea/
+.DS_store
+.swift/
+.swift-cache/
 
 ### Node ###
 # Logs
