@@ -15,6 +15,15 @@ function formatSingaporeDate(date: Date | string) {
   return formatted;
 }
 
+function formatAsTime(date: Date | string) {
+  const parsedDate = new Date(date);
+  const formatted = format(parsedDate, 'h:mm aa', {
+    in: tz(SINGAPORE_TIME_ZONE),
+  });
+
+  return formatted;
+}
+
 export function escapeMarkdownV2(reply: string) {
   return reply
     .replaceAll('.', '\\.')
@@ -37,7 +46,7 @@ export function buildWeatherReply(
   reply += `*CDA*:\n`;
   reply += `🌡️ Heat Stress: ${cda.heatStress} ${cda.emoji.symbol}\n`;
   reply += `🌍 WBGT: ${cda.wbgt} °C\n`;
-  reply += `🌬️ Air Temp: ${cda.airTemp} °C\n\n`;
+  reply += `🌬️ Air Temp: ${cda.airTemp} °C\n`;
 
   const templateCda = Template.getTemplateFromColor(
     Template.Color.GREEN,
@@ -50,10 +59,10 @@ export function buildWeatherReply(
   }
 
   // HTTC Section
-  reply += `*HTTC*:\n`;
+  reply += `\n*HTTC*:\n`;
   reply += `🌡️ Heat Stress: ${httc.heatStress} ${httc.emoji.symbol}\n`;
   reply += `🌍 WBGT: ${httc.wbgt} °C\n`;
-  reply += `🌬️ Air Temp: ${httc.airTemp} °C\n\n`;
+  reply += `🌬️ Air Temp: ${httc.airTemp} °C\n`;
 
   const templateHttc = Template.getTemplateFromColor(
     Template.Color.GREEN,
@@ -62,11 +71,11 @@ export function buildWeatherReply(
 
   if (templateHttc) {
     reply += `📝 Remarks*: ${templateHttc.remarks}\n`;
-    reply += `⏳ Work/Rest Cycle: ${templateHttc.workRestCycle}\n`;
+    reply += `⏳ Work/Rest Cycle: ${templateHttc.workRestCycle}\n\n`;
   }
 
   if (options?.jobDate) {
-    reply += `\nJob date: ${formatSingaporeDate(new Date())}`;
+    reply += `\nReported at: ${formatSingaporeDate(new Date())}`;
   }
 
   if (options?.nextUpdate) {
