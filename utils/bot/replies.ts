@@ -29,7 +29,22 @@ export function escapeMarkdownV2(reply: string) {
   return reply
     .replaceAll('.', '\\.')
     .replaceAll('(', '\\(')
-    .replaceAll(')', '\\)');
+    .replaceAll(')', '\\)')
+    .replaceAll('-', '\\-')
+    .replaceAll('!', '\\!')
+    .replaceAll('_', '\\_')
+    .replaceAll('*', '\\*')
+    .replaceAll('[', '\\[')
+    .replaceAll(']', '\\]')
+    .replaceAll('`', '\\`')
+    .replaceAll('>', '\\>')
+    .replaceAll('#', '\\#')
+    .replaceAll('+', '\\+')
+    .replaceAll('=', '\\=')
+    .replaceAll('|', '\\|')
+    .replaceAll('{', '\\{')
+    .replaceAll('}', '\\}')
+    .replaceAll('~', '\\~');
 }
 
 export function buildWeatherReply(
