@@ -33,34 +33,7 @@ function formatAsTime(date: Date | string) {
  * @return {*} escaped string
  */
 export function escapeMarkdownV2(text: string) {
-  const SPECIAL_CHARS = [
-    '\\',
-    '_',
-    '*',
-    '[',
-    ']',
-    '(',
-    ')',
-    '~',
-    '`',
-    '>',
-    '<',
-    '&',
-    '#',
-    '+',
-    '-',
-    '=',
-    '|',
-    '{',
-    '}',
-    '.',
-    '!',
-  ];
-
-  let escaped = text;
-
-  SPECIAL_CHARS.forEach((char) => (text = text.replaceAll(char, `\\${char}`)));
-  return text;
+  return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
 }
 
 export function buildWeatherReply(
