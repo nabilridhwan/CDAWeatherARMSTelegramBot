@@ -2,6 +2,7 @@ import { tz } from '@date-fns/tz';
 import { format } from 'date-fns/format';
 import { Weather } from '../../api/weather.api';
 import { Rota } from '../schedule/rota';
+import { MessageQueue } from './messageQueue';
 import { Template } from './template';
 
 const SINGAPORE_TIME_ZONE = 'Asia/Singapore';
@@ -215,8 +216,9 @@ function getErrorMessage(error: unknown): string {
   return 'Unknown error';
 }
 
-export function buildWeatherFetchFailedMessage(error: unknown): string {
-  return `⚠️ Couldn't fetch weather data. Please try /weather again in a few moments.\n\nStatus code: ${getStatusCode(error)}\nError: ${getErrorMessage(error)}`;
+export function buildErrorMessage(context: MessageQueue.ErrorContext): string {
+  const { error, message } = context;
+  return `⚠️ ${message}\n\nStatus code: ${getStatusCode(error)}\nError: ${getErrorMessage(error)}`;
 }
 
 export const NOT_SUBSCRIBED_MESSAGE = `You're not subscribed to any weather updates. Use /start to get set up.`;

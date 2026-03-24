@@ -3,9 +3,9 @@ import { Context, Telegraf } from 'telegraf';
 
 import { Weather } from '../../api/weather.api';
 import logger from '../infra/logger';
-import { buildWeatherFetchFailedMessage, buildWeatherReply } from './replies';
+import { buildErrorMessage, buildWeatherReply } from './replies';
 
-export namespace WeatherReportSender {
+export namespace MessageQueue {
   const SEND_QUEUE_CONCURRENCY = 5;
   const SEND_QUEUE_INTERVAL_CAP = 20;
   const SEND_QUEUE_INTERVAL_MS = 1_000;
@@ -19,6 +19,15 @@ export namespace WeatherReportSender {
     interval: SEND_QUEUE_INTERVAL_MS,
     carryoverConcurrencyCount: true,
   });
+
+  export interface ErrorContext {
+    type:
+      | 'weather fetch failure'
+      | 'message send/edit failure'
+      | 'on-demand weather report failure';
+    message: string;
+    error: unknown;
+  }
 
   type TelegramError = {
     response?: {
@@ -82,11 +91,11 @@ export namespace WeatherReportSender {
     return RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1) + jitter;
   }
 
-  async function sendOrEditWeatherReport(
+  async function sendOrEditMessage(
     bot: Telegraf<Context>,
     chatId: number,
-    escapedReply: string,
-    opts: Parameters<typeof buildWeatherReply>[2] & {
+    message: string,
+    opts: {
       editMessageId?: number;
     },
   ) {
@@ -95,7 +104,7 @@ export namespace WeatherReportSender {
         chatId,
         opts.editMessageId,
         undefined,
-        escapedReply,
+        message,
         {
           parse_mode: 'MarkdownV2',
         },
@@ -104,7 +113,7 @@ export namespace WeatherReportSender {
       return;
     }
 
-    await bot.telegram.sendMessage(chatId, escapedReply, {
+    await bot.telegram.sendMessage(chatId, message, {
       parse_mode: 'MarkdownV2',
     });
     logger.info(`Weather report sent to chat ID: ${chatId}`);
@@ -113,14 +122,14 @@ export namespace WeatherReportSender {
   async function sendWithRetry(
     bot: Telegraf<Context>,
     chatId: number,
-    escapedReply: string,
-    opts: Parameters<typeof buildWeatherReply>[2] & {
+    message: string,
+    opts: {
       editMessageId?: number;
     },
   ) {
     for (let attempt = 1; attempt <= MAX_SEND_ATTEMPTS; attempt++) {
       try {
-        await sendOrEditWeatherReport(bot, chatId, escapedReply, opts);
+        await sendOrEditMessage(bot, chatId, message, opts);
         return;
       } catch (error) {
         const shouldRetry =
@@ -142,14 +151,10 @@ export namespace WeatherReportSender {
   async function notifyChatAboutError(
     bot: Telegraf<Context>,
     chatId: number,
-    error: unknown,
-    context: string,
+    context: ErrorContext,
   ) {
     try {
-      await bot.telegram.sendMessage(
-        chatId,
-        buildWeatherFetchFailedMessage(error),
-      );
+      await bot.telegram.sendMessage(chatId, buildErrorMessage(context));
     } catch (notifyError) {
       logger.error(
         `Failed to send error message to chat ID ${chatId} after ${context}:`,
@@ -158,31 +163,45 @@ export namespace WeatherReportSender {
     }
   }
 
-  async function enqueueWeatherSend(
+  async function enqueueMessageSend(
     bot: Telegraf<Context>,
     chatId: number,
-    escapedReply: string,
-    opts: Parameters<typeof buildWeatherReply>[2] & {
+    message: string,
+    opts: {
       editMessageId?: number;
     },
   ) {
     await sendQueue.add(async () => {
       try {
-        await sendWithRetry(bot, chatId, escapedReply, opts);
+        await sendWithRetry(bot, chatId, message, opts);
       } catch (error) {
-        logger.error(
-          `Failed to send weather report to chat ID ${chatId}:`,
-          error,
-        );
+        logger.error(`Failed to send message to chat ID ${chatId}:`, error);
 
-        await notifyChatAboutError(
-          bot,
-          chatId,
+        await notifyChatAboutError(bot, chatId, {
+          type: 'message send/edit failure',
+          message: 'Failed to send or edit message',
           error,
-          'weather report send/edit failure',
-        );
+        });
       }
     });
+  }
+
+  export async function sendAnnouncementMessages(
+    bot: Telegraf<Context>,
+    chatIds: number[],
+    announcement: string,
+  ) {
+    try {
+      await Promise.all(
+        chatIds.map((chatId) =>
+          enqueueMessageSend(bot, chatId, announcement, {}),
+        ),
+      );
+
+      logger.info('Announcement messages sent to all subscribed chats.');
+    } catch (error) {
+      logger.error('Failed to send announcement messages:', error);
+    }
   }
 
   export async function sendWeatherMessages(
@@ -196,12 +215,12 @@ export namespace WeatherReportSender {
       return;
     }
 
-    let escapedReply: string;
+    let msg: string;
 
     try {
       const { data: readings, isCached } =
         await Weather.getCachedOrFetchWeatherDataForBot();
-      escapedReply = buildWeatherReply(
+      msg = buildWeatherReply(
         {
           heatStress: readings.cdaWBGT.heatStress,
           wbgt: readings.cdaWBGT.wbgt,
@@ -231,7 +250,11 @@ export namespace WeatherReportSender {
       await Promise.all(
         chatIds.map((chatId) =>
           sendQueue.add(() =>
-            notifyChatAboutError(bot, chatId, error, 'weather fetch failure'),
+            notifyChatAboutError(bot, chatId, {
+              type: 'weather fetch failure',
+              message: 'Failed to fetch weather data',
+              error,
+            }),
           ),
         ),
       );
@@ -240,11 +263,8 @@ export namespace WeatherReportSender {
     }
 
     // If opts.editMessageId is provided, we will attempt to edit the existing message instead of sending a new one. This is used for on-demand weather updates to replace the loading message with the weather report.
-
     await Promise.all(
-      chatIds.map((chatId) =>
-        enqueueWeatherSend(bot, chatId, escapedReply, opts),
-      ),
+      chatIds.map((chatId) => enqueueMessageSend(bot, chatId, msg, opts)),
     );
   }
 

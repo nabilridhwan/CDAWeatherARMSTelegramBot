@@ -6,6 +6,7 @@ import { Rota } from '../utils/schedule/rota';
 export namespace Redis {
   const environment = env.NODE_ENV === 'production' ? 'prod' : 'dev';
   const WEATHER_JOB_LOCK_KEY_PREFIX = `${environment}:locks:weather_job`;
+  const ADMIN_USER_ID_KEY = `${environment}:admin_user_ids`;
   const RELEASE_LOCK_SCRIPT = `
     if redis.call("GET", KEYS[1]) == ARGV[1] then
       return redis.call("DEL", KEYS[1])
@@ -80,6 +81,40 @@ export namespace Redis {
     } catch (err) {
       logger.error(`Failed to set rota subscription: ${err}`);
     }
+  }
+
+  export async function checkIfUserIsAdmin(userId: number): Promise<boolean> {
+    const redis = getRedisClient();
+    return (await redis.sismember(ADMIN_USER_ID_KEY, userId)) === 1;
+  }
+
+  export async function addAdminUserId(userId: number): Promise<void> {
+    const redis = getRedisClient();
+    await redis.sadd(ADMIN_USER_ID_KEY, userId);
+  }
+
+  export async function removeAdminUserId(userId: number): Promise<void> {
+    const redis = getRedisClient();
+    await redis.srem(ADMIN_USER_ID_KEY, userId);
+  }
+
+  export async function getAllChatIds(): Promise<string[]> {
+    const redis = getRedisClient();
+    const officeHoursChatIds = await redis.smembers(
+      Rota.REDIS_KEY_OFFICE_HOURS_CHAT_IDS,
+    );
+    const rota1ChatIds = await redis.smembers(Rota.getRedisKeyForRota(1));
+    const rota2ChatIds = await redis.smembers(Rota.getRedisKeyForRota(2));
+    const rota3ChatIds = await redis.smembers(Rota.getRedisKeyForRota(3));
+
+    return Array.from(
+      new Set([
+        ...officeHoursChatIds,
+        ...rota1ChatIds,
+        ...rota2ChatIds,
+        ...rota3ChatIds,
+      ]),
+    );
   }
 
   export async function getSubscribedChatIdsForDate(

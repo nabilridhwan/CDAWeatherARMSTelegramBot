@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { Markup, Telegraf } from 'telegraf';
 import { Lightning } from './api/lightning.api';
 import { Redis } from './api/redis.api';
+import { MessageQueue } from './utils/bot/messageQueue';
 import {
   buildAlreadySubscribedMessage,
   buildRotaSetSuccessMessage,
@@ -13,7 +14,6 @@ import {
   WELCOME_SUBSCRIBED_MESSAGE,
 } from './utils/bot/replies';
 import { rule } from './utils/bot/rule';
-import { WeatherReportSender } from './utils/bot/weatherReportSender';
 import { env } from './utils/infra/env';
 import logger from './utils/infra/logger';
 import { Rota } from './utils/schedule/rota';
@@ -155,7 +155,7 @@ function registerHandlers(bot: Telegraf, job: schedule.Job) {
 
     const loadingMessage = await ctx.reply(LOADING_MESSAGE);
 
-    await WeatherReportSender.sendWeatherMessages(bot, [ctx.chat.id], {
+    await MessageQueue.sendWeatherMessages(bot, [ctx.chat.id], {
       jobDate: new Date(),
       editMessageId: loadingMessage.message_id,
     });
@@ -223,6 +223,36 @@ function registerHandlers(bot: Telegraf, job: schedule.Job) {
   });
 }
 
+function registerAdminHandlers(bot: Telegraf, job: schedule.Job) {
+  // Usage: /announcement [message]
+  // Example: /announcement Weather update will be delayed today due to API issues.
+  bot.command('announcement', async (ctx) => {
+    if (ctx.from.id.toString() !== env.OWNER_USER_ID) {
+      ctx.reply('You are not authorized to use this command.');
+      return;
+    }
+
+    const announcement = ctx.message.text.split(' ').slice(1).join(' ');
+
+    if (!announcement) {
+      ctx.reply('Please provide a message for the announcement.');
+      return;
+    }
+
+    const subscribedChatIds = await Redis.getAllChatIds();
+
+    await MessageQueue.sendAnnouncementMessages(
+      bot,
+      subscribedChatIds.map((id) => parseInt(id, 10)),
+      announcement,
+    );
+
+    logger.info(
+      `Admin announcement sent by user: ${ctx.from.username} (ID: ${ctx.from.id}). Message: ${announcement}`,
+    );
+  });
+}
+
 // ==============================
 // #region Scheduled job to send weather updates
 // ==============================
@@ -256,7 +286,7 @@ function createJob(bot: Telegraf): schedule.Job {
         return;
       }
 
-      await WeatherReportSender.sendWeatherMessages(
+      await MessageQueue.sendWeatherMessages(
         bot,
         subscribedChatIds.map((id) => parseInt(id, 10)),
         {
@@ -288,6 +318,7 @@ export function startBot(): BotRuntime {
   const bot = createBot();
   const job = createJob(bot);
   registerBotActionHandlers(bot, job);
+  registerAdminHandlers(bot, job);
   registerHandlers(bot, job);
   return { bot, job };
 }

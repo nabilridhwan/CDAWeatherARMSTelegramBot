@@ -5,7 +5,7 @@ import { Redis } from './api/redis.api';
 import { startBot } from './bot';
 import { verifyTelegramSecretToken } from './middleware/verifyTelegramSecretToken';
 import { version } from './package.json';
-import { WeatherReportSender } from './utils/bot/weatherReportSender';
+import { MessageQueue } from './utils/bot/messageQueue';
 import { env } from './utils/infra/env';
 import logger from './utils/infra/logger';
 import { ensureSecretToken } from './utils/security/generateSecretToken';
@@ -90,7 +90,7 @@ async function shutdown(signal: 'SIGINT' | 'SIGTERM', exitCode?: number) {
   job.cancel();
 
   try {
-    await WeatherReportSender.waitForIdle();
+    await MessageQueue.waitForIdle();
   } catch (error) {
     logger.error('Error while waiting for outbound queue to drain:', error);
   }
