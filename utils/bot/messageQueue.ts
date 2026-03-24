@@ -3,7 +3,11 @@ import { Context, Telegraf } from 'telegraf';
 
 import { Weather } from '../../api/weather.api';
 import logger from '../infra/logger';
-import { buildErrorMessage, buildWeatherReply } from './replies';
+import {
+  buildErrorMessage,
+  buildWeatherReply,
+  escapeMarkdownV2,
+} from './replies';
 
 export namespace MessageQueue {
   const SEND_QUEUE_CONCURRENCY = 5;
@@ -173,7 +177,7 @@ export namespace MessageQueue {
   ) {
     await sendQueue.add(async () => {
       try {
-        await sendWithRetry(bot, chatId, message, opts);
+        await sendWithRetry(bot, chatId, escapeMarkdownV2(message), opts);
       } catch (error) {
         logger.error(`Failed to send message to chat ID ${chatId}:`, error);
 
