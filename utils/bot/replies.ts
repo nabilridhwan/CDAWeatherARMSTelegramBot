@@ -55,7 +55,7 @@ export function buildWeatherReply(
 
   if (templateCda) {
     reply += `⏳ Work/Rest Cycle: ${templateCda.workRestCycle}\n`;
-    reply += `📝 Remarks*: ${templateCda.remarks}\n`;
+    reply += `📝 Remarks: ${templateCda.remarks}\n`;
   }
 
   // HTTC Section
@@ -70,7 +70,7 @@ export function buildWeatherReply(
   );
 
   if (templateHttc) {
-    reply += `📝 Remarks*: ${templateHttc.remarks}\n`;
+    reply += `📝 Remarks: ${templateHttc.remarks}\n`;
     reply += `⏳ Work/Rest Cycle: ${templateHttc.workRestCycle}\n\n`;
   }
 
