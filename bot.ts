@@ -247,6 +247,8 @@ function registerAdminHandlers(bot: Telegraf, job: schedule.Job) {
       announcement,
     );
 
+    ctx.reply('✅ Announcement sent to all subscribed chats.');
+
     logger.info(
       `Admin announcement sent by user: ${ctx.from.username} (ID: ${ctx.from.id}). Message: ${announcement}`,
     );
