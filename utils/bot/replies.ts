@@ -70,20 +70,20 @@ export function buildWeatherReply(
   );
 
   if (templateHttc) {
-    reply += `⏳ Work/Rest Cycle: ${templateHttc.workRestCycle}\n\n`;
+    reply += `⏳ Work/Rest Cycle: ${templateHttc.workRestCycle}\n`;
     reply += `📝 Remarks: ${templateHttc.remarks}\n`;
   }
 
   if (options?.jobDate) {
-    reply += `\nReported at: ${formatSingaporeDate(new Date())}`;
+    reply += `\n🕐 Updated: ${formatAsTime(cda.dateTime ?? httc.dateTime ?? new Date())}`;
   }
 
   if (options?.nextUpdate) {
-    reply += `\nNext update: ${formatSingaporeDate(options.nextUpdate)}`;
+    reply += `\n➡️ Next update: ${formatSingaporeDate(options.nextUpdate)}`;
   }
 
   if (options?.isCached) {
-    reply += '\n⚡ Cache Hit';
+    reply += '\n⚡ Cache hit';
   }
 
   return escapeMarkdownV2(reply);
