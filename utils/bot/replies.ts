@@ -24,27 +24,43 @@ function formatAsTime(date: Date | string) {
 
   return formatted;
 }
+/**
+ * Escapes special characters in a string for safe use in Telegram MarkdownV2 formatting.
+ * Read: https://github.com/telegraf/telegraf/issues/1242#issuecomment-1489968508
+ *
+ * @export
+ * @param {string} text
+ * @return {*} escaped string
+ */
+export function escapeMarkdownV2(text: string) {
+  const SPECIAL_CHARS = [
+    '\\',
+    '_',
+    '*',
+    '[',
+    ']',
+    '(',
+    ')',
+    '~',
+    '`',
+    '>',
+    '<',
+    '&',
+    '#',
+    '+',
+    '-',
+    '=',
+    '|',
+    '{',
+    '}',
+    '.',
+    '!',
+  ];
 
-export function escapeMarkdownV2(reply: string) {
-  return reply
-    .replaceAll('.', '\\.')
-    .replaceAll('(', '\\(')
-    .replaceAll(')', '\\)')
-    .replaceAll('-', '\\-')
-    .replaceAll('!', '\\!')
-    .replaceAll('_', '\\_')
-    .replaceAll('*', '\\*')
-    .replaceAll('[', '\\[')
-    .replaceAll(']', '\\]')
-    .replaceAll('`', '\\`')
-    .replaceAll('>', '\\>')
-    .replaceAll('#', '\\#')
-    .replaceAll('+', '\\+')
-    .replaceAll('=', '\\=')
-    .replaceAll('|', '\\|')
-    .replaceAll('{', '\\{')
-    .replaceAll('}', '\\}')
-    .replaceAll('~', '\\~');
+  let escaped = text;
+
+  SPECIAL_CHARS.forEach((char) => (text = text.replaceAll(char, `\\${char}`)));
+  return text;
 }
 
 export function buildWeatherReply(
