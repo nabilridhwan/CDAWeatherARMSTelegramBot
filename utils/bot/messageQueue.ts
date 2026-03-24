@@ -151,7 +151,13 @@ export namespace MessageQueue {
       }
     }
   }
-
+  /**
+   * Notify the chat about an error that occurred during message sending or weather fetching. This is used to inform users when something goes wrong, such as when the bot fails to fetch weather data or send a message after retries.
+   *
+   * @param {Telegraf<Context>} bot
+   * @param {number} chatId
+   * @param {ErrorContext} context
+   */
   async function notifyChatAboutError(
     bot: Telegraf<Context>,
     chatId: number,
@@ -183,7 +189,7 @@ export namespace MessageQueue {
 
         await notifyChatAboutError(bot, chatId, {
           type: 'message send/edit failure',
-          message: 'Failed to send or edit message',
+          message: 'Something went wrong',
           error,
         });
       }
