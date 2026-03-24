@@ -102,7 +102,10 @@ export namespace Weather {
       heatStress: string;
       wbgt: string;
       airTemp: number;
-      emoji: string;
+      emoji: {
+        color: string;
+        symbol: string;
+      };
       dateTime: string;
     };
   }
@@ -121,17 +124,31 @@ export namespace Weather {
      * Get the WBGT emoji based on the heat stress level.
      * @param heatStress
      */
-    export function parseWBGTHeatStress(heatStress: string): string {
+    export function parseWBGTHeatStress(
+      heatStress: string,
+    ): Types.WeatherSnapshot['emoji'] {
       const heatStressLower = heatStress.toLowerCase();
 
       if (heatStressLower === 'low') {
-        return '🟢'; // Green for low heat stress
+        return {
+          color: 'green',
+          symbol: '🟢', // Green for low heat stress
+        };
       } else if (heatStressLower === 'moderate') {
-        return '🟡'; // Yellow for moderate heat stress
+        return {
+          color: 'yellow',
+          symbol: '🟡', // Yellow for moderate heat stress
+        };
       } else if (heatStressLower.includes('hi')) {
-        return '🔴'; // Red for very high heat stress
+        return {
+          color: 'red',
+          symbol: '🔴', // Red for very high heat stress
+        };
       } else {
-        return '⚪'; // White for unknown or other cases
+        return {
+          color: 'white',
+          symbol: '⚪', // White for unknown or other cases
+        };
       }
     }
   }

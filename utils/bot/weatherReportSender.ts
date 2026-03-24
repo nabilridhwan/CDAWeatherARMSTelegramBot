@@ -3,10 +3,7 @@ import { Context, Telegraf } from 'telegraf';
 
 import { Weather } from '../../api/weather.api';
 import logger from '../infra/logger';
-import {
-  buildEscapedWeatherReply,
-  buildWeatherFetchFailedMessage,
-} from './replies';
+import { buildWeatherFetchFailedMessage, buildWeatherReply } from './replies';
 
 export namespace WeatherReportSender {
   const SEND_QUEUE_CONCURRENCY = 5;
@@ -89,7 +86,7 @@ export namespace WeatherReportSender {
     bot: Telegraf<Context>,
     chatId: number,
     escapedReply: string,
-    opts: Parameters<typeof buildEscapedWeatherReply>[1] & {
+    opts: Parameters<typeof buildWeatherReply>[2] & {
       editMessageId?: number;
     },
   ) {
@@ -117,7 +114,7 @@ export namespace WeatherReportSender {
     bot: Telegraf<Context>,
     chatId: number,
     escapedReply: string,
-    opts: Parameters<typeof buildEscapedWeatherReply>[1] & {
+    opts: Parameters<typeof buildWeatherReply>[2] & {
       editMessageId?: number;
     },
   ) {
@@ -165,7 +162,7 @@ export namespace WeatherReportSender {
     bot: Telegraf<Context>,
     chatId: number,
     escapedReply: string,
-    opts: Parameters<typeof buildEscapedWeatherReply>[1] & {
+    opts: Parameters<typeof buildWeatherReply>[2] & {
       editMessageId?: number;
     },
   ) {
@@ -191,7 +188,7 @@ export namespace WeatherReportSender {
   export async function sendWeatherMessages(
     bot: Telegraf<Context>,
     chatIds: number[],
-    opts: Parameters<typeof buildEscapedWeatherReply>[1] & {
+    opts: Parameters<typeof buildWeatherReply>[2] & {
       editMessageId?: number;
     },
   ) {
@@ -204,7 +201,27 @@ export namespace WeatherReportSender {
     try {
       const { data: readings, isCached } =
         await Weather.getCachedOrFetchWeatherDataForBot();
-      escapedReply = buildEscapedWeatherReply(readings, { ...opts, isCached });
+      escapedReply = buildWeatherReply(
+        {
+          heatStress: readings.cdaWBGT.heatStress,
+          wbgt: readings.cdaWBGT.wbgt,
+          airTemp: readings.cdaAirTemp.value,
+          emoji: Weather.Parser.parseWBGTHeatStress(
+            readings.cdaWBGT.heatStress,
+          ),
+          dateTime: readings.cdaWBGT.dateTime,
+        },
+        {
+          heatStress: readings.httcWBGT.heatStress,
+          wbgt: readings.httcWBGT.wbgt,
+          airTemp: readings.httcAirTemp.value,
+          emoji: Weather.Parser.parseWBGTHeatStress(
+            readings.httcWBGT.heatStress,
+          ),
+          dateTime: readings.httcWBGT.dateTime,
+        },
+        { ...opts, isCached },
+      );
     } catch (error) {
       logger.error(
         'Failed to fetch weather readings before sending reports:',

@@ -2,6 +2,7 @@ import { tz } from '@date-fns/tz';
 import { format } from 'date-fns/format';
 import { Weather } from '../../api/weather.api';
 import { Rota } from '../schedule/rota';
+import { Template } from './template';
 
 const SINGAPORE_TIME_ZONE = 'Asia/Singapore';
 
@@ -30,25 +31,53 @@ export function buildWeatherReply(
     isCached?: boolean;
   },
 ) {
-  let baseReply = `*CDA*:\n🌡️ Heat Stress: ${cda.heatStress} ${cda.emoji}\n🌍 WBGT: ${cda.wbgt} °C\n🌬️ Air Temp: ${cda.airTemp} °C\n\n*HTTC*:\n🌡️ Heat Stress: ${httc.heatStress} ${httc.emoji}\n🌍 WBGT: ${httc.wbgt} °C\n🌬️ Air Temp: ${httc.airTemp} °C\n\nLast updated: ${formatSingaporeDate(cda.dateTime)}`;
+  let reply = '';
 
-  if (options?.isCached) {
-    baseReply += '\n*(Cache Hit)*';
+  // CDA Section
+  reply += `*CDA*:\n`;
+  reply += `🌡️ Heat Stress: ${cda.heatStress} ${cda.emoji.symbol}\n`;
+  reply += `🌍 WBGT: ${cda.wbgt} °C\n`;
+  reply += `🌬️ Air Temp: ${cda.airTemp} °C\n\n`;
+
+  const templateCda = Template.getTemplateFromColor(
+    Template.Color.GREEN,
+    'CDA',
+  );
+
+  if (templateCda) {
+    reply += `⏳ Work/Rest Cycle: ${templateCda.workRestCycle}\n`;
+    reply += `📝 Remarks*: ${templateCda.remarks}\n`;
   }
 
-  // if (!options?.jobDate || !options?.nextUpdate) {
-  //   return baseReply;
-  // }
+  // HTTC Section
+  reply += `*HTTC*:\n`;
+  reply += `🌡️ Heat Stress: ${httc.heatStress} ${httc.emoji.symbol}\n`;
+  reply += `🌍 WBGT: ${httc.wbgt} °C\n`;
+  reply += `🌬️ Air Temp: ${httc.airTemp} °C\n\n`;
+
+  const templateHttc = Template.getTemplateFromColor(
+    Template.Color.GREEN,
+    'HTTC',
+  );
+
+  if (templateHttc) {
+    reply += `📝 Remarks*: ${templateHttc.remarks}\n`;
+    reply += `⏳ Work/Rest Cycle: ${templateHttc.workRestCycle}\n`;
+  }
 
   if (options?.jobDate) {
-    baseReply += `\nJob date: ${formatSingaporeDate(new Date())}`;
+    reply += `\nJob date: ${formatSingaporeDate(new Date())}`;
   }
 
   if (options?.nextUpdate) {
-    baseReply += `\nNext update: ${formatSingaporeDate(options.nextUpdate)}`;
+    reply += `\nNext update: ${formatSingaporeDate(options.nextUpdate)}`;
   }
 
-  return baseReply;
+  if (options?.isCached) {
+    reply += '\n⚡ Cache Hit';
+  }
+
+  return escapeMarkdownV2(reply);
 }
 
 export function buildAlreadySubscribedMessage(
@@ -175,35 +204,6 @@ function getErrorMessage(error: unknown): string {
   }
 
   return 'Unknown error';
-}
-
-export function buildEscapedWeatherReply(
-  readings: Weather.Types.WeatherReadings,
-  options?: {
-    jobDate?: Date;
-    nextUpdate?: Date;
-    isCached?: boolean;
-  },
-) {
-  const reply = buildWeatherReply(
-    {
-      heatStress: readings.cdaWBGT.heatStress,
-      wbgt: readings.cdaWBGT.wbgt,
-      airTemp: readings.cdaAirTemp.value,
-      emoji: Weather.Parser.parseWBGTHeatStress(readings.cdaWBGT.heatStress),
-      dateTime: readings.cdaWBGT.dateTime,
-    },
-    {
-      heatStress: readings.httcWBGT.heatStress,
-      wbgt: readings.httcWBGT.wbgt,
-      airTemp: readings.httcAirTemp.value,
-      emoji: Weather.Parser.parseWBGTHeatStress(readings.httcWBGT.heatStress),
-      dateTime: readings.httcWBGT.dateTime,
-    },
-    options,
-  );
-
-  return escapeMarkdownV2(reply);
 }
 
 export function buildWeatherFetchFailedMessage(error: unknown): string {
