@@ -91,7 +91,7 @@ export function buildWeatherReply(
     reply += '\n⚡ Cache hit';
   }
 
-  return escapeMarkdownV2(reply);
+  return reply;
 }
 
 export function buildAlreadySubscribedMessage(
