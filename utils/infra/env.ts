@@ -18,6 +18,7 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(['development', 'test', 'production'])
       .default('development'),
+    OWNER_USER_ID: z.string(),
   },
   runtimeEnvStrict: {
     BOT_ID: process.env.BOT_ID,
@@ -29,6 +30,7 @@ export const env = createEnv({
     PORT: process.env.PORT,
     SECRET_TOKEN: process.env.SECRET_TOKEN,
     NODE_ENV: process.env.NODE_ENV,
+    OWNER_USER_ID: process.env.OWNER_USER_ID,
   },
   emptyStringAsUndefined: true,
 });
