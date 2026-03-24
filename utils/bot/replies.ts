@@ -70,8 +70,8 @@ export function buildWeatherReply(
   );
 
   if (templateHttc) {
-    reply += `📝 Remarks: ${templateHttc.remarks}\n`;
     reply += `⏳ Work/Rest Cycle: ${templateHttc.workRestCycle}\n\n`;
+    reply += `📝 Remarks: ${templateHttc.remarks}\n`;
   }
 
   if (options?.jobDate) {
