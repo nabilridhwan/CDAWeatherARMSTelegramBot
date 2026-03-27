@@ -6,7 +6,7 @@ import logger from '../infra/logger';
 import {
   buildErrorMessage,
   buildWeatherReply,
-  escapeMarkdownV2,
+  escapeHtml,
 } from './replies';
 
 export namespace MessageQueue {
@@ -110,7 +110,7 @@ export namespace MessageQueue {
         undefined,
         message,
         {
-          parse_mode: 'MarkdownV2',
+          parse_mode: 'HTML',
         },
       );
       logger.info(`Weather report edited for chat ID: ${chatId}`);
@@ -118,7 +118,7 @@ export namespace MessageQueue {
     }
 
     await bot.telegram.sendMessage(chatId, message, {
-      parse_mode: 'MarkdownV2',
+      parse_mode: 'HTML',
     });
     logger.info(`Weather report sent to chat ID: ${chatId}`);
   }
@@ -164,7 +164,9 @@ export namespace MessageQueue {
     context: ErrorContext,
   ) {
     try {
-      await bot.telegram.sendMessage(chatId, buildErrorMessage(context));
+      await bot.telegram.sendMessage(chatId, buildErrorMessage(context), {
+        parse_mode: 'HTML',
+      });
     } catch (notifyError) {
       logger.error(
         `Failed to send error message to chat ID ${chatId} after ${context}:`,
@@ -183,7 +185,7 @@ export namespace MessageQueue {
   ) {
     await sendQueue.add(async () => {
       try {
-        await sendWithRetry(bot, chatId, escapeMarkdownV2(message), opts);
+        await sendWithRetry(bot, chatId, message, opts);
       } catch (error) {
         logger.error(`Failed to send message to chat ID ${chatId}:`, error);
 
@@ -204,7 +206,7 @@ export namespace MessageQueue {
     try {
       await Promise.all(
         chatIds.map((chatId) =>
-          enqueueMessageSend(bot, chatId, announcement, {}),
+          enqueueMessageSend(bot, chatId, escapeHtml(announcement), {}),
         ),
       );
 

@@ -35,7 +35,9 @@ function registerBotActionHandlers(bot: Telegraf, job: schedule.Job) {
   bot.action('set_rota_1', async (ctx) => {
     await Redis.assignRota(1, ctx);
     const nextUpdate = Rota.getNextUpdateDateForRota(1) || job.nextInvocation();
-    ctx.editMessageText(buildRotaSetSuccessMessage(1, nextUpdate));
+    ctx.editMessageText(buildRotaSetSuccessMessage(1, nextUpdate), {
+      parse_mode: 'HTML',
+    });
     ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
   });
 
@@ -43,21 +45,27 @@ function registerBotActionHandlers(bot: Telegraf, job: schedule.Job) {
     // call assignRota
     await Redis.assignRota(2, ctx);
     const nextUpdate = Rota.getNextUpdateDateForRota(2) || job.nextInvocation();
-    ctx.editMessageText(buildRotaSetSuccessMessage(2, nextUpdate));
+    ctx.editMessageText(buildRotaSetSuccessMessage(2, nextUpdate), {
+      parse_mode: 'HTML',
+    });
     ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
   });
 
   bot.action('set_rota_3', async (ctx) => {
     await Redis.assignRota(3, ctx);
     const nextUpdate = Rota.getNextUpdateDateForRota(3) || job.nextInvocation();
-    ctx.editMessageText(buildRotaSetSuccessMessage(3, nextUpdate));
+    ctx.editMessageText(buildRotaSetSuccessMessage(3, nextUpdate), {
+      parse_mode: 'HTML',
+    });
     ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
   });
 
   bot.action('set_office_hours', async (ctx) => {
     await Redis.assignRota('office_hours', ctx);
     const nextUpdate = job.nextInvocation();
-    ctx.editMessageText(buildRotaSetSuccessMessage('office_hours', nextUpdate));
+    ctx.editMessageText(buildRotaSetSuccessMessage('office_hours', nextUpdate), {
+      parse_mode: 'HTML',
+    });
     ctx.answerCbQuery(); // Acknowledge the callback query to remove the loading state
   });
 
@@ -121,7 +129,7 @@ function registerHandlers(bot: Telegraf, job: schedule.Job) {
         nextUpdateForSubscription,
       );
 
-      ctx.telegram.sendMessage(ctx.chat.id, msg, undefined);
+      ctx.telegram.sendMessage(ctx.chat.id, msg, { parse_mode: 'HTML' });
 
       logger.info(
         'Chat ID: ' + ctx.chat.id + ' is already subscribed. No action taken.',
@@ -132,12 +140,15 @@ function registerHandlers(bot: Telegraf, job: schedule.Job) {
     ctx.telegram.sendMessage(
       ctx.chat.id,
       WELCOME_SUBSCRIBED_MESSAGE,
-      Markup.inlineKeyboard([
-        Markup.button.callback('Rota 1', 'set_rota_1'),
-        Markup.button.callback('Rota 2', 'set_rota_2'),
-        Markup.button.callback('Rota 3', 'set_rota_3'),
-        Markup.button.callback('Office Hours', 'set_office_hours'),
-      ]),
+      {
+        ...Markup.inlineKeyboard([
+          Markup.button.callback('Rota 1', 'set_rota_1'),
+          Markup.button.callback('Rota 2', 'set_rota_2'),
+          Markup.button.callback('Rota 3', 'set_rota_3'),
+          Markup.button.callback('Office Hours', 'set_office_hours'),
+        ]),
+        parse_mode: 'HTML',
+      },
     );
 
     logger.info('Added Chat ID: ' + ctx.chat.id + ' to subscribed chat IDs.');
@@ -206,20 +217,23 @@ function registerHandlers(bot: Telegraf, job: schedule.Job) {
     ctx.telegram.sendMessage(
       ctx.chat.id,
       buildSettingsMessages(rotaNumber),
-      Markup.inlineKeyboard([
-        [
-          Markup.button.callback('Rota 1', 'set_rota_1'),
-          Markup.button.callback('Rota 2', 'set_rota_2'),
-          Markup.button.callback('Rota 3', 'set_rota_3'),
-          Markup.button.callback('Office Hours', 'set_office_hours'),
-        ],
-        [Markup.button.callback('Stop Updates', 'stop_updates')],
-      ]),
+      {
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback('Rota 1', 'set_rota_1'),
+            Markup.button.callback('Rota 2', 'set_rota_2'),
+            Markup.button.callback('Rota 3', 'set_rota_3'),
+            Markup.button.callback('Office Hours', 'set_office_hours'),
+          ],
+          [Markup.button.callback('Stop Updates', 'stop_updates')],
+        ]),
+        parse_mode: 'HTML',
+      },
     );
   });
 
   bot.help((ctx) => {
-    ctx.reply(HELP_MESSAGE);
+    ctx.reply(HELP_MESSAGE, { parse_mode: 'HTML' });
   });
 }
 

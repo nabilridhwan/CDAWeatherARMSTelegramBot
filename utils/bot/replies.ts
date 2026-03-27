@@ -24,16 +24,11 @@ function formatAsTime(date: Date | string) {
 
   return formatted;
 }
-/**
- * Escapes special characters in a string for safe use in Telegram MarkdownV2 formatting.
- * Read: https://github.com/telegraf/telegraf/issues/1242#issuecomment-1489968508
- *
- * @export
- * @param {string} text
- * @return {*} escaped string
- */
-export function escapeMarkdownV2(text: string) {
-  return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
+export function escapeHtml(text: string) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 export function buildWeatherReply(
@@ -48,10 +43,10 @@ export function buildWeatherReply(
   let reply = '';
 
   // CDA Section
-  reply += `*CDA*:\n`;
-  reply += `🌡️ Heat Stress: ${cda.heatStress} ${cda.emoji.symbol}\n`;
-  reply += `🌍 WBGT: ${cda.wbgt} °C\n`;
-  reply += `🌬️ Air Temp: ${cda.airTemp} °C\n`;
+  reply += `<b>CDA</b>:\n`;
+  reply += `🌡️ Heat Stress: ${escapeHtml(cda.heatStress)} ${escapeHtml(cda.emoji.symbol)}\n`;
+  reply += `🌍 WBGT: ${escapeHtml(String(cda.wbgt))} °C\n`;
+  reply += `🌬️ Air Temp: ${escapeHtml(String(cda.airTemp))} °C\n`;
 
   const templateCda = Template.getTemplateFromColor(
     Template.Color.GREEN,
@@ -59,15 +54,15 @@ export function buildWeatherReply(
   );
 
   if (templateCda) {
-    reply += `⏳ Work/Rest Cycle: ${templateCda.workRestCycle}\n`;
-    reply += `📝 Remarks: ${templateCda.remarks}\n`;
+    reply += `⏳ Work/Rest Cycle: ${escapeHtml(templateCda.workRestCycle)}\n`;
+    reply += `📝 Remarks: ${escapeHtml(templateCda.remarks)}\n`;
   }
 
   // HTTC Section
-  reply += `\n*HTTC*:\n`;
-  reply += `🌡️ Heat Stress: ${httc.heatStress} ${httc.emoji.symbol}\n`;
-  reply += `🌍 WBGT: ${httc.wbgt} °C\n`;
-  reply += `🌬️ Air Temp: ${httc.airTemp} °C\n`;
+  reply += `\n<b>HTTC</b>:\n`;
+  reply += `🌡️ Heat Stress: ${escapeHtml(httc.heatStress)} ${escapeHtml(httc.emoji.symbol)}\n`;
+  reply += `🌍 WBGT: ${escapeHtml(String(httc.wbgt))} °C\n`;
+  reply += `🌬️ Air Temp: ${escapeHtml(String(httc.airTemp))} °C\n`;
 
   const templateHttc = Template.getTemplateFromColor(
     Template.Color.GREEN,
@@ -75,16 +70,16 @@ export function buildWeatherReply(
   );
 
   if (templateHttc) {
-    reply += `⏳ Work/Rest Cycle: ${templateHttc.workRestCycle}\n`;
-    reply += `📝 Remarks: ${templateHttc.remarks}\n`;
+    reply += `⏳ Work/Rest Cycle: ${escapeHtml(templateHttc.workRestCycle)}\n`;
+    reply += `📝 Remarks: ${escapeHtml(templateHttc.remarks)}\n`;
   }
 
   if (options?.jobDate) {
-    reply += `\n🕐 Updated: ${formatAsTime(cda.dateTime ?? httc.dateTime ?? new Date())}`;
+    reply += `\n🕐 Updated: ${escapeHtml(formatAsTime(cda.dateTime ?? httc.dateTime ?? new Date()))}`;
   }
 
   if (options?.nextUpdate) {
-    reply += `\n➡️ Next update: ${formatSingaporeDate(options.nextUpdate)}`;
+    reply += `\n➡️ Next update: ${escapeHtml(formatSingaporeDate(options.nextUpdate))}`;
   }
 
   if (options?.isCached) {
@@ -103,9 +98,9 @@ export function buildAlreadySubscribedMessage(
 
   return `👋🏻 You're already subscribed to the CDA ARMS Weather Bot!
 
-You are currently on *${schedule}* and will receive weather updates accordingly.
+You are currently on <b>${escapeHtml(schedule)}</b> and will receive weather updates accordingly.
 
-Next update: ${formatSingaporeDate(nextUpdate)}
+Next update: ${escapeHtml(formatSingaporeDate(nextUpdate))}
 
 Use /settings to change your schedule or unsubscribe.`;
 }
@@ -116,7 +111,7 @@ This bot automatically sends you WBGT and heat stress updates for CDA and HTTC �
 
 Reports are sent every weekday at 09:50, 11:50, 13:50, and 15:50 SGT.
 
-*Getting started:*
+<b>Getting started:</b>
 1️⃣ Select your rota below to receive updates on your working days
 2️⃣ Or select "Office Hours" to receive updates every weekday
 3️⃣ Use /weather anytime to get a live snapshot of the current weather data
@@ -127,11 +122,11 @@ export function buildSettingsMessages(rotaNumber: Rota.WorkingSchedule) {
   const schedule =
     rotaNumber === 'office_hours' ? 'Office Hours' : `Rota ${rotaNumber}`;
 
-  return `⚙️ *Settings*
+  return `⚙️ <b>Settings</b>
 
-You are currently on *${schedule}* and will receive weather updates accordingly.
+You are currently on <b>${escapeHtml(schedule)}</b> and will receive weather updates accordingly.
 
-To change your schedule, select a different option below. To stop updates, press the *Stop Updates* button below.`;
+To change your schedule, select a different option below. To stop updates, press the <b>Stop Updates</b> button below.`;
 }
 
 export const SETROTA_ERROR_MESSAGE =
@@ -144,17 +139,17 @@ export function buildRotaSetSuccessMessage(
   if (rota === 'office_hours') {
     return `✅ You're subscribed to Office Hours. You will receive weather updates every weekday. To change your schedule or stop updates, use the /settings command.
     
-Next update: ${formatSingaporeDate(nextJobRun)}
+Next update: ${escapeHtml(formatSingaporeDate(nextJobRun))}
     `;
   }
 
   return `✅ You're subscribed to Rota ${rota}. You will receive weather updates on your rota working days. To change your rota or stop updates, use the /settings command.
 
-Next update: ${formatSingaporeDate(nextJobRun)}
+Next update: ${escapeHtml(formatSingaporeDate(nextJobRun))}
   `;
 }
 
-export const HELP_MESSAGE = `🤖 *CDA ARMS Weather Bot — Help*
+export const HELP_MESSAGE = `🤖 <b>CDA ARMS Weather Bot - Help</b>
 
 This bot sends you WBGT and heat stress updates for CDA and HTTC, 10 minutes before each ARMS Weather Report deadline — so you don't have to manually check myENV.
 
@@ -222,7 +217,7 @@ function getErrorMessage(error: unknown): string {
 
 export function buildErrorMessage(context: MessageQueue.ErrorContext): string {
   const { error, message } = context;
-  return `⚠️ ${message}\n\nStatus code: ${getStatusCode(error)}\nError: ${getErrorMessage(error)}`;
+  return `⚠️ ${escapeHtml(message)}\n\nStatus code: ${escapeHtml(getStatusCode(error))}\nError: ${escapeHtml(getErrorMessage(error))}`;
 }
 
 export const NOT_SUBSCRIBED_MESSAGE = `You're not subscribed to any weather updates. Use /start to get set up.`;
